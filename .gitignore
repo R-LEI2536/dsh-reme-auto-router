@@ -1,0 +1,34 @@
+# Build outputs — `lib/` is intentionally tracked: GitHub release tarballs
+# must include compiled JS so `dsh plugin add "link:"` / release-tarball
+# installs work without a `pnpm install` step. `pnpm run build` still
+# regenerates `lib/` via the `prepare` script for local development.
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# ReMe runtime data — written by the reme process this plugin spawns.
+# Each workspace normally lives at <workspace>/.reme/ but on dev
+# checkouts the cwd IS the workspace, so the subdirs land at the plugin
+# root and would otherwise show up as untracked clutter.
+/.reme/
+/daily/
+/digest/
+/metadata/
+/session/
+/mem_session/
+/resource/
+/logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*

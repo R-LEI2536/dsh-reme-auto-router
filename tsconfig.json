@@ -1,0 +1,37 @@
+{
+  // Local tsconfig for reme-auto-router. Self-contained — does NOT extend
+  // any external base, so this plugin type-checks standalone once the
+  // peer dependencies are installed in this directory's node_modules.
+  //
+  // Typecheck-only: `noEmit: true` keeps `pnpm run typecheck` from
+  // touching `lib/`. JS + .d.ts emission lives in `tsconfig.build.json`
+  // and runs from `pnpm run build` (and `prepare`, so `npm install`
+  // / `pnpm install` produce a usable `lib/index.js` for the cordis
+  // loader).
+  //
+  // OutDir is `lib/types` to match the deepseek-harness convention used
+  // by sibling plugins; no `rootDir` so workspace package imports stay
+  // in the same program without violating single-rootDir containment.
+  "compilerOptions": {
+    "target": "es2024",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "declarationMap": true,
+    "incremental": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["node"],
+    "outDir": "./lib/types",
+    "composite": false,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.mts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "lib"]
+}

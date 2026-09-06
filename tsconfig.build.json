@@ -1,0 +1,20 @@
+{
+  // Build-mode tsconfig: emits JS + .d.ts to ./lib/ so the cordis loader
+  // can resolve `main: "./lib/index.js"`. Extends the typecheck tsconfig so
+  // strict / noUncheckedIndexedAccess / noImplicitOverride stay in lockstep
+  // with `pnpm run typecheck`. Only `src/**/*.ts` ships — tests and the
+  // ambient cordis-augment.d.ts declaration are excluded.
+  //
+  // rootDir is pinned to ./src so the output mirrors the source layout
+  // (lib/index.js, lib/state-store.js, …) without the `src/` prefix that
+  // the typecheck tsconfig would otherwise produce.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./lib",
+    "rootDir": "./src",
+    "incremental": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "tests", "lib"]
+}

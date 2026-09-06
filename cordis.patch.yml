@@ -1,0 +1,8 @@
+# dsh-reme-auto-router — profile patch layer.
+# Wired into dsh.profile.bundles via package.json#dsh.bundle.patch.
+# Local dev: see ./cordis.yml for the absolute-path override used during hacking.
+# `name` matches package.json#name so `dsh plugin --profile web remove dsh-reme-auto-router`
+# resolves the same identifier dsh uses for `add`.
+- insert:
+    - id: dsh-reme-auto-router
+      name: dsh-reme-auto-router

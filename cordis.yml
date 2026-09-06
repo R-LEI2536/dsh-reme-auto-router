@@ -1,0 +1,3 @@
+- insert:
+    - id: reme-auto-router
+      name: '/home/hive/projects/dsh-plugin_dev/dsh-reme-auto-router/src/index.ts'
