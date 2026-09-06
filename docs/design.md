@@ -303,7 +303,7 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 
 ## 12. 已知限制
 
-- **WebUI 设置页未实现**：v1 `reme-auto-router` namespace 仅在 `~/.dsh/settings.yaml` 手编生效
+- **WebUI 设置页未实现**：v1 `reme-auto-router` namespace 仅在 `~/.dsh/settings.yaml` 手编生效（v0.2 计划做）
 - **不做主动健康检查**：reme 自身错误由 `reme_search` 工具报错接住
 - **多 tab 同时活跃不同 workspace**：取最近一次活跃为 active cwd
 - **不预先启动 pinned**：pin 的语义是"保活"，不是"预加载"
@@ -312,6 +312,7 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 - **推送去重粒度是 cwd+文本**：同一 cwd 同一渲染文本不重复推；快速切换 workspace 时每个目标 cwd 各推一次
 - **没有 user-launched chip / 常驻 chip**：v1 没做 Client 插件，等以后
 - **Windows 不支持**：manual-adopter 用 `lsof` + `/proc/<pid>/cmdline`（macOS/Linux）；Windows 路径未实现
+- **切 workspace 期间 endpoint 数据错位**（v0.1.0 bug）：切 workspace 后到新 reme ready 之间（<500ms~5s），reme 调用仍打到老 reme。详见 §16.1
 
 ---
 
@@ -331,12 +332,14 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 
 ## 14. 实施状态
 
-参见 `/home/hive/projects/dsh-plugin_dev/dsh-reme-auto-router/src/` 下各文件。每个 .ts 文件对应本设计的一个子系统。
+**v0.1.0 已发布**（GitHub `R-LEI2536/dsh-reme-auto-router` main 分支，commit `29e7963`，2026-09-06）。
 
-**已完成**：
+每个 .ts 文件对应本设计的一个子系统：
+
+**已完成（v0.1.0）**：
 - settings-schema.ts — reme-auto-router namespace
 - state-store.ts — atomic JSON write + port 分配
-- process-manager.ts — spawn / idle / kill / 三态切换
+- process-manager.ts — spawn / idle / kill / 三态切换；**v0.1.0 起 spawn argv 不传 `workspace_dir=`，由 reme 默认值 `.reme/` + plugin 设的 cwd 解析到 `<workspace>/.reme/`**
 - endpoint-coordinator.ts — 写 `reme-memory.endpoint`
 - workspace-detector.ts — 订阅 `api-session/status` + realpath cwd
 - manual-adopter.ts — 端口扫描 + cmdline 解析
@@ -345,6 +348,12 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 - push-notifier.ts — host-side `commands.execute` 推卡片 + 去重
 - index.ts — apply() 主入口
 - tests/ — import-check + smoke-apply
+- cordis-augment.d.ts — cordis Context/Events ambient augmentation（独立 package 装出来的 cordis 类型已知在 monorepo 内 augment，本地 vendoring）
+- tsconfig.build.json — 独立 build 配置，emit 到 `lib/`
+- README.md — 用户使用文档 + 「reme 数据落点」段落
+
+**v0.1.0 已知问题**（详见 §16）：
+- 切 workspace 期间 endpoint 数据错位（§16.1，P0 优先）
 
 **已废弃**（不再使用，源文件已删除）：
 - status-section.ts — systemPrompt 注册路径已删除；用户感知改走 slash-command + push-notifier 的卡片通道
@@ -359,3 +368,79 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 - `SubprocessHandle` 有 `pid` / `done` / `terminate()` / `waitForExit(signal)`，符合需求
 - `ctx.systemPrompt.section({name, order, text})` 接受 `text: string | ((ctx) => string)`，lazy 求值免费
 - `api-session/status(sessionId, running: boolean)` 是 active session 切换的真信号
+
+---
+
+## 16. v0.2 backlog（按优先级）
+
+### 16.1 [P0] 切 workspace 期间 endpoint 数据错位 bug
+
+**症状**：用户切 workspace 后到新 reme ready 之间（实测 <500ms，最坏 5s），`ctx.settings['reme-memory'].endpoint` 仍指**老 workspace** 的 reme。任何 reme 调用（`reme_search`、autoMemory cron、autoDream、health_check 等）在这窗口内打到**老** reme，导致：
+
+1. `autoMemory` 后台写 daily → 老 workspace 的 daily 被污染（最隐蔽，用户无感）
+3. Agent `reme_search` → 返回老 workspace 的记忆 → 答案错（用户可能误信）
+4. WebUI status 卡片 → "starting (新 workspace)" + 老 endpoint URL，状态自相矛盾
+5. 用户主动点"立即整理" → 整理错 workspace
+
+**根因**：`src/index.ts:111` 在 `detector.onActiveCwdChanged` 里无条件调 `coordinator.route(cwd)`；`endpoint-coordinator.ts:114` 的 `runRoute` 在 instance 不是 `ready` 时直接 return，**不在更新 endpoint**——保留上一个 ready 实例的 endpoint。等 `manager.onStateChange` 在新 reme ready 时才 fire → `coordinator.route(activeCwd)` → endpoint 才切换。窗口期 = spawn + probe_ready 总时间。
+
+**修法**（**修法二 / 延后 detector 发布 active cwd**，唯一真正修 bug 的方案）：
+
+`workspace-detector.ts` 增加 `preparing` 状态：
+- `onStatus(running=true)` 收到时，把 (sessionId, cwd) 标记为 `preparing`，**不** publish 到 active cwd
+- `process-manager` 的 `onStateChange` 在新 reme ready 时通知 detector → detector 把对应 preparing 项 promote 为 active
+- detector 在 promote 之前**不**调 coordinator.route、**不**调 pushNotifier
+- 用户 user 视角：点 workspace → "切换中..."卡片 → 几百ms~5s 后 ready 卡片出现
+
+**改动量**：
+- `workspace-detector.ts`：增加 `Map<SessionId, 'preparing' | 'active'>` 状态机；onStatus 和 onStateChanged 协同
+- `endpoint-coordinator.ts`：保持原样（无清空逻辑）
+- `index.ts`：调整 pushNotifier 触发条件（preparing 时推"切换中..."卡片）
+- 新增 preparing卡片样式：复用 `formatHead` + `formatTail`，状态文本用"⏳ reme 准备中…"
+- 测试：smoke-apply.mts 加一条"preparing→ready 转换序列"
+- 约 80-120 行改动
+
+**取舍**：切 workspace 期间 UX 短暂延迟（"切换中..."），但**数据正确性**——窗口期内 reme 调用仍走老 reme，**老 reme 是 ready 的、数据正确**。比 v0.1.0 的"数据错位"是质的改进。
+
+### 16.2 [P1] WebUI 设置页（`reme-auto-router` namespace 暴露 UI）
+
+v1 只支持 `~/.dsh/settings.yaml` 手编。补上：
+- `cordis.patch.yml` 挂 `@deepseek-ai/dsh-client-ui-settings-plugins` 入口
+- 写 client 组件：渲染 settings section（boolean 开关 + 数字 input + 数组（pinnedDirs））
+- 表单 schema 复用 `src/settings-schema.ts` 的 zod schema（已存在）
+
+约 200-300 行 client.tsx。
+
+### 16.3 [P2] publish 链路 + GitHub Actions
+
+- `package.json#private` 改 `false`、版本号升 0.2.0
+- 是否发 npm（待定，看用户决定分发渠道）
+- GitHub Actions：`pnpm run verify` 在 PR 上跑 + main push 时打 release tarball
+
+### 16.4 [P3] 上游议题：reme 的 `workspace_dir` 设计
+
+当前 reme 的 `schema/application_config.py:31` 把 `workspace_dir` 默认值硬编码为字面字符串 `".reme"`，且子目录 (`daily_dir`/`metadata_dir` 等) 也是裸字符串相对路径。这种设计依赖 reme 进程的 CWD，**不在 schema 里暴露绝对路径**导致外部 caller 无法优雅控制数据位置。
+
+建议上游：
+- `workspace_dir` 默认值改成可读 `$DSH_HOME/plugin-data/reme/<workspace-hash>/` 或类似
+- 子目录保持相对 `workspace_dir` 解析（合理）
+
+不动 plugin 代码，影响 plugin 上下游设计讨论。
+
+### 16.5 [P3] README 增补手编示例 + 故障排查
+
+- 加一段"`~/.dsh/settings.yaml` 的完整手编示例 + 各字段释义"
+- 故障排查节："切 workspace 后立刻点立即整理 → 数据错位"（指向 §16.1）
+- "reme 数据落 `<workspace>/.reme/`" + "`logs/` 是 reme 硬编码不在 `.reme/`"（指向 §11）
+
+### 16.6 [P3] `logs/` 目录污染
+
+reme 的 `utils/logger_utils.py:92` 把 `log_dir` 硬编码为 `"logs"`（不在 schema），`os.makedirs(log_dir)` 解析到 `<cwd>/logs/` 而非 `<workspace>/.reme/logs/`。`/logs/` 已 gitignore，**无实际危害**。上游修法依赖 §16.4。
+
+### 16.7 [P4] defense-in-depth：pid + port probe 在 ensure() 入口
+
+运行期 reme 真死但 `handle.done` Promise 不触发（dsh-subprocess regression 防御）：
+- `ensure(cwd)` 入口检查 pid liveness (`process.kill(pid, 0)`) AND port probe (TCP `127.0.0.1:port`)
+- 任一不通 → 丢弃 stale instance → 重新 spawn
+
+非紧急，**不进 v0.2**。
