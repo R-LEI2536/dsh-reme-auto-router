@@ -58,6 +58,8 @@ export interface StoreLogger {
 export declare class StateStore {
     private doc;
     private logger?;
+    /** Serialised persist queue; see {@link persist} for the rationale. */
+    private persistChain;
     /** Load from disk; replaces any in-memory state. Idempotent. */
     load(logger?: StoreLogger): Promise<void>;
     /** Replace or insert one record, then persist. */
@@ -75,6 +77,7 @@ export declare class StateStore {
      */
     allocatePort(base: number, range: number): number;
     private persist;
+    private doPersist;
     private warn;
 }
 //# sourceMappingURL=state-store.d.ts.map

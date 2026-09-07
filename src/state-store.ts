@@ -80,6 +80,8 @@ export interface StoreLogger {
 export class StateStore {
   private doc: StateDocument = { ...EMPTY_DOC }
   private logger?: StoreLogger
+  /** Serialised persist queue; see {@link persist} for the rationale. */
+  private persistChain: Promise<void> = Promise.resolve()
 
   /** Load from disk; replaces any in-memory state. Idempotent. */
   async load(logger?: StoreLogger): Promise<void> {
@@ -147,6 +149,19 @@ export class StateStore {
   }
 
   private async persist(): Promise<void> {
+    // Serialise persist calls on a per-instance promise chain. Without
+    // this, two concurrent replaceRecord/removeRecord calls race on
+    // the shared `state.json.tmp` file: each call's `open(..., 'w')`
+    // truncates the other's tmp, and the loser's eventual `rename`
+    // sees ENOENT because the winner already renamed. The chain
+    // matches the pattern EndpointCoordinator.route uses; rejections
+    // are caught so a single failed write does not poison the queue.
+    const next = this.persistChain.then(() => this.doPersist()).catch(() => undefined)
+    this.persistChain = next
+    return next
+  }
+
+  private async doPersist(): Promise<void> {
     const dir = stateDirectory()
     await fs.mkdir(dir, { recursive: true })
     const finalPath = stateFilePath()
