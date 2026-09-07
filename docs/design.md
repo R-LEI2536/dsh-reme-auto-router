@@ -384,7 +384,7 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 
 **根因**：`src/index.ts:111` 在 `detector.onActiveCwdChanged` 里无条件调 `coordinator.route(cwd)`；`endpoint-coordinator.ts:114` 的 `runRoute` 在 instance 不是 `ready` 时直接 return，**不在更新 endpoint**——保留上一个 ready 实例的 endpoint。等 `manager.onStateChange` 在新 reme ready 时才 fire → `coordinator.route(activeCwd)` → endpoint 才切换。窗口期 = spawn + probe_ready 总时间。
 
-**修法**（**修法二 / 延后 detector 发布 active cwd**，唯一真正修 bug 的方案）：
+**修法**（**修法二 / 延后 detector 发布 active cwd**，v0.2.0 已实现）：
 
 `workspace-detector.ts` 增加 `preparing` 状态：
 - `onStatus(running=true)` 收到时，把 (sessionId, cwd) 标记为 `preparing`，**不** publish 到 active cwd
@@ -392,13 +392,15 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 - detector 在 promote 之前**不**调 coordinator.route、**不**调 pushNotifier
 - 用户 user 视角：点 workspace → "切换中..."卡片 → 几百ms~5s 后 ready 卡片出现
 
-**改动量**：
-- `workspace-detector.ts`：增加 `Map<SessionId, 'preparing' | 'active'>` 状态机；onStatus 和 onStateChanged 协同
-- `endpoint-coordinator.ts`：保持原样（无清空逻辑）
-- `index.ts`：调整 pushNotifier 触发条件（preparing 时推"切换中..."卡片）
-- 新增 preparing卡片样式：复用 `formatHead` + `formatTail`，状态文本用"⏳ reme 准备中…"
-- 测试：smoke-apply.mts 加一条"preparing→ready 转换序列"
-- 约 80-120 行改动
+**v0.2.0 实现细节**（与计划一致）：
+
+- `WorkspaceDetector` 新增 `manager` 依赖（构造时传入），订阅 `manager.onStateChange`，在 `status='ready'` 时 `tryPromote(cwd)`；promote 后才发 `onActiveCwdChanged` 事件
+- 新增 `onPreparingCwdChanged` 事件，载荷 `{ cwd, sessionId }`，仅在 preparing 集合变化时发
+- `activeCwd()` / `activeSessionId()` 现在返回 sessions 中**最近一个 mode='active'** 的——prepare 窗口期返回 OLD cwd，所以 coordinator 不会写 endpoint
+- 新增 `preparingCwd()` / `preparingSessionId()` 镜像 API
+- `index.ts` listener 拆两条：`onPreparingCwdChanged` 触发 `manager.ensure` + 推 "starting…" 卡（沿用 `renderStatusLine` 'starting' 分支）；`onActiveCwdChanged` 写 endpoint + 推 ready 卡；保留 `manager.onStateChange` 兜底 unavailable 状态
+- `endpoint-coordinator.ts` / `process-manager.ts` / `push-notifier.ts` / `settings-schema.ts`：**零改动**
+- 新增 `tests/detector-state.mts`（24 个 check 全过）：6 个用例覆盖 onStatus→preparing、promote、并发 preparing、ready 竞速、session 移除、重复 status no-op
 
 **取舍**：切 workspace 期间 UX 短暂延迟（"切换中..."），但**数据正确性**——窗口期内 reme 调用仍走老 reme，**老 reme 是 ready 的、数据正确**。比 v0.1.0 的"数据错位"是质的改进。
 

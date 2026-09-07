@@ -22,8 +22,9 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:import": "tsx tests/import-check.mts",
+    "test:detector": "tsx tests/detector-state.mts",
     "test:apply": "tsx tests/smoke-apply.mts",
-    "verify": "pnpm run typecheck && pnpm run test:import && pnpm run test:apply",
+    "verify": "pnpm run typecheck && pnpm run test:import && pnpm run test:detector && pnpm run test:apply",
     "prepare": "pnpm run build"
   },
   "devDependencies": {
