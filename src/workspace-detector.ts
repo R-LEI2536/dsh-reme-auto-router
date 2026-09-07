@@ -200,6 +200,20 @@ export class WorkspaceDetector {
       const previous = this.sessions.get(sessionId)
       // Already active with the same cwd — nothing to do.
       if (previous?.cwd === cwd && previous.mode === 'active') return
+      // Optimisation (v0.2.0.1): a brand-new session whose cwd is
+      // already covered by another active session (e.g. the user
+      // opened a new tab in the currently-active workspace) joins
+      // the active set directly. The reme instance for that cwd is
+      // already up, so we skip the preparing path: no manager.ensure
+      // (which would otherwise call touch() and trigger a
+      // state-store write per call), no onPreparingCwdChanged
+      // listener fire, no push card. The activeCwdValue is
+      // unchanged, so fireActive's own dedup swallows the no-op.
+      if (previous === undefined && this.hasActiveSessionForCwd(cwd)) {
+        this.sessions.set(sessionId, { cwd, mode: 'active' })
+        this.fireActive()
+        return
+      }
       // New session, cwd change, or re-entering a still-preparing session.
       // In all three cases, ensure() and stay/become preparing.
       this.sessions.set(sessionId, { cwd, mode: 'preparing' })
@@ -300,5 +314,17 @@ export class WorkspaceDetector {
       if (sess.mode === 'preparing') result = { sessionId, cwd: sess.cwd }
     }
     return result
+  }
+
+  /**
+   * True when at least one session in the map is already active for
+   * `cwd`. Used by `onStatus` to short-circuit the preparing path
+   * when the user opens a new tab in an already-active workspace.
+   */
+  private hasActiveSessionForCwd(cwd: string): boolean {
+    for (const sess of this.sessions.values()) {
+      if (sess.cwd === cwd && sess.mode === 'active') return true
+    }
+    return false
   }
 }

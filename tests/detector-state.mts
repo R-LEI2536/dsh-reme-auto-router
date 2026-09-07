@@ -92,8 +92,12 @@ class ManagerStub {
   private readonly instances = new Map<string, RemeInstance>()
   private readonly listeners = new Set<StateChangeListener>()
   private nextPort = 23_33
+  /** Counter for `ensure()` calls — used by test 7 to assert the
+   *  "skip preparing" optimisation actually avoids the call. */
+  public ensureCallCount = 0
 
   async ensure(cwd: string): Promise<RemeInstance> {
+    this.ensureCallCount++
     let inst = this.instances.get(cwd)
     if (inst === undefined) {
       inst = {
@@ -302,6 +306,45 @@ async function test6_alreadyActiveSameCwdIsNoop(): Promise<void> {
   detector.stop()
 }
 
+async function test7_sameCwdNewSessionJoinsActiveDirectly(): Promise<void> {
+  const ctx = new ContextStub()
+  const sessions = new SessionsStub()
+  ctx.provide('sessions', sessions)
+  const mgr = new ManagerStub()
+  const detector = new WorkspaceDetector({ ctx: ctx as never, manager: mgr })
+  const trace = newTrace()
+  detector.onPreparingCwdChanged((e) => trace.preparing.push(e))
+  detector.onActiveCwdChanged((e) => trace.active.push(e))
+  detector.start()
+
+  // Bring session A to active for canonicalA.
+  sessions.put(A, canonicalA)
+  ctx.emit('api-session/status', A, true)
+  await tick()
+  mgr.markReady(canonicalA)
+  await tick()
+
+  // Now a brand-new session B opens in the SAME workspace. The
+  // detector should detect the active session for canonicalA and
+  // add B directly to the active set, skipping the preparing path.
+  const ensureBefore = mgr.ensureCallCount
+  const preparingBefore = trace.preparing.length
+  const activeBefore = trace.active.length
+
+  sessions.put(B, canonicalA)
+  ctx.emit('api-session/status', B, true)
+  await tick()
+
+  check('7.1 B joins the active set (activeSessionId() === B)', detector.activeSessionId() === B)
+  check('7.2 onPreparingCwdChanged NOT fired for B', trace.preparing.length === preparingBefore)
+  check('7.3 onActiveCwdChanged NOT fired (activeCwd unchanged)', trace.active.length === activeBefore)
+  check('7.4 mgr.ensure NOT called for B', mgr.ensureCallCount === ensureBefore, `ensureCallCount went from ${String(ensureBefore)} to ${String(mgr.ensureCallCount)}`)
+  check('7.5 activeCwd() still === canonicalA', detector.activeCwd() === canonicalA)
+  check('7.6 preparingCwd() === undefined (B did not enter preparing)', detector.preparingCwd() === undefined)
+
+  detector.stop()
+}
+
 async function main(): Promise<void> {
   await test1_preparingFiresOnNewSession()
   await test2_promoteOnReady()
@@ -309,6 +352,7 @@ async function main(): Promise<void> {
   await test4_promoteLaterCwdsWins()
   await test5_sessionRemovalFiresActive()
   await test6_alreadyActiveSameCwdIsNoop()
+  await test7_sameCwdNewSessionJoinsActiveDirectly()
   if (failed > 0) {
     console.error(`\n${failed} check(s) failed`)
     process.exit(1)

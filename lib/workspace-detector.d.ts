@@ -148,5 +148,11 @@ export declare class WorkspaceDetector {
     private fireActive;
     private lastActiveEntry;
     private lastPreparingEntry;
+    /**
+     * True when at least one session in the map is already active for
+     * `cwd`. Used by `onStatus` to short-circuit the preparing path
+     * when the user opens a new tab in an already-active workspace.
+     */
+    private hasActiveSessionForCwd;
 }
 //# sourceMappingURL=workspace-detector.d.ts.map
