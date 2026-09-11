@@ -376,6 +376,16 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 
 ## 16. v0.2 backlog（按优先级）
 
+### 16.0 v0.2.0 changelog
+
+`v0.2.0` 关闭 §16.1（修复 P0）+ §16.3（升版本号 + `private:false`）：
+
+- **依赖区间升至 `^0.1.5-rc.1`**：原 `0.1.2-rc.1` 精确钉在 node-semver 下无法解析到 `0.1.5-rc.1`，导致本地 typecheck / test 都还跑在 0.1.2 上。详见 ADR-0001 与 `deepseek-harness/DSH-0.1.5-UPGRADE-AUDIT.md` §3.2、§四
+- **managed 实例的 pid 字段退役**：DSH 0.1.5 普通 `SubprocessHandle` 不再暴露 `pid`；`RemeInstance.pid` / `InstanceRecord.pid` / `StatusSnapshot.pid` 改可选；`terminateTree` 去掉 `pid === -1` 哨兵；卡片文案对 managed 实例退化为 `port N`，adopted 仍显示 `port N · pid M`（adopter 路径不变）
+- **`private: false` + `version: 0.2.0`**：允许走 GitHub release tarball 分发；npm 发布仍待 §16.3 后续决定
+
+未做：§16.2 WebUI 设置页、§16.3 GitHub Actions、§16.4..§16.7 backlog 全部留到下个版本。
+
 ### 16.1 [P0] 切 workspace 期间 endpoint 数据错位 bug
 
 **症状**：用户切 workspace 后到新 reme ready 之间（实测 <500ms，最坏 5s），`ctx.settings['reme-memory'].endpoint` 仍指**老 workspace** 的 reme。任何 reme 调用（`reme_search`、autoMemory cron、autoDream、health_check 等）在这窗口内打到**老** reme，导致：
