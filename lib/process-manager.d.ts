@@ -20,11 +20,18 @@ import type { RemeAutoRouterSettings } from './settings-schema.ts';
 import type { StateStore } from './state-store.ts';
 /** Lifecycle state of one managed reme instance. */
 export type RemeStatus = 'starting' | 'ready' | 'unavailable';
-/** Live record kept in ProcessManager's map (extends persisted record). */
+/**
+ * Live record kept in ProcessManager's map (extends persisted record).
+ *
+ * `pid` is optional: 0.1.5's plain `SubprocessHandle` no longer exposes `pid`,
+ * so managed instances have `pid` undefined. Adopted instances still carry the
+ * OS pid (resolved by `ManualAdopter` via `lsof`), since the user-launched
+ * process is independent of our handle.
+ */
 export interface RemeInstance {
     cwd: string;
     port: number;
-    pid: number;
+    pid?: number;
     ownership: 'managed' | 'adopted';
     status: RemeStatus;
     /** Last error message when status transitions to `unavailable`. */

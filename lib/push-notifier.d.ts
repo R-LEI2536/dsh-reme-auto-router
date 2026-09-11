@@ -19,11 +19,17 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent/types';
 import type { SessionId } from '@deepseek-ai/dsh-session/types';
 import type { RemeInstance } from './process-manager.ts';
-/** Shape the slash-command handler and the notifier both render from. */
+/**
+ * Shape the slash-command handler and the notifier both render from.
+ *
+ * `pid` is optional: managed instances never have one (0.1.5's plain
+ * SubprocessHandle no longer exposes `pid`), so the rendered status line
+ * degrades to "port N" when it is missing.
+ */
 export interface StatusSnapshot {
     readonly cwd: string;
     readonly port: number;
-    readonly pid: number;
+    readonly pid?: number;
     readonly ownership: 'managed' | 'adopted';
     readonly status: 'starting' | 'ready' | 'unavailable';
     readonly title: string;

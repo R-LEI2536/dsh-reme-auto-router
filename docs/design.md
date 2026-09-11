@@ -247,10 +247,13 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 
 | 状态 | ownership | 卡片文本 |
 |---|---|---|
-| `ready` | `managed` | `🔄 reme ready (project-a)\nport 2334 · pid 316741` |
+| `ready` | `managed` | `🔄 reme ready (project-a)\nport 2334` |
 | `ready` | `adopted` | `👀 adopted reme ready (project-a)\nport 2334 · pid 316741` |
 | `starting` | any | `🔄 reme starting… (project-a)` |
-| `unavailable` | any | `⚠ reme unavailable (project-a)\nport 2334 · pid 316741 — port did not bind within 5s` |
+| `unavailable` | `managed` | `⚠ reme unavailable (project-a)\nport 2334 — port did not bind within 5s` |
+| `unavailable` | `adopted` | `⚠ reme unavailable (project-a)\nport 2334 · pid 316741 — port did not bind within 5s` |
+
+> 0.1.5 起普通 SubprocessHandle 不再暴露 `pid`，所以 managed 实例的卡片只显示端口；adopted 仍由 ManualAdopter 经 `lsof` 反查到 OS pid，显示完整 `port · pid`。
 
 ### 去重语义
 
@@ -365,7 +368,7 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 - `workspaceController.follow()` 返回 `WorkspaceFollowFrame = {type:'baseline', value} | WorkspaceFollowIncrement`，但 `upsert` 不代表"切换"，仅代表 workspace 状态变化
 - `workspaceRegistry.resolveByPath(path)` 返回 `Workspace` 对象（带 `path` / `title` / `sessionIds`）
 - `ctx.settings.installSection(ctx, ns, schema, entry, hooks)` 是公开 API，可直接调用
-- `SubprocessHandle` 有 `pid` / `done` / `terminate()` / `waitForExit(signal)`，符合需求
+- `SubprocessHandle` 暴露 `done` / `terminate()` / `waitForExit(signal?)` / stdio streams / collected；**0.1.5 起 `pid` 已从普通 SubprocessHandle 移除**（仅 `SubprocessTerminalHandle` 仍保留）。managed 实例不再记录 OS pid，文案退化为 "port N"；adopted 仍由 ManualAdopter 经 lsof 拿到 pid
 - `ctx.systemPrompt.section({name, order, text})` 接受 `text: string | ((ctx) => string)`，lazy 求值免费
 - `api-session/status(sessionId, running: boolean)` 是 active session 切换的真信号
 
@@ -410,6 +413,7 @@ v1 只支持 `~/.dsh/settings.yaml` 手编。补上：
 - `cordis.patch.yml` 挂 `@deepseek-ai/dsh-client-ui-settings-plugins` 入口
 - 写 client 组件：渲染 settings section（boolean 开关 + 数字 input + 数组（pinnedDirs））
 - 表单 schema 复用 `src/settings-schema.ts` 的 zod schema（已存在）
+- **0.1.5 panel API**：根 slot 改为 `sidebar.panellist`（侧栏条目挂载点）+ `main`（主区面板）；旧的裸 `conversation` slot 与 `conversation.details.tool` 已删除。设置项走 `settings.section` / `settings.plugin.item`，仍可用——这两个细粒度 slot 在 0.1.5 保留
 
 约 200-300 行 client.tsx。
 
@@ -439,10 +443,10 @@ v1 只支持 `~/.dsh/settings.yaml` 手编。补上：
 
 reme 的 `utils/logger_utils.py:92` 把 `log_dir` 硬编码为 `"logs"`（不在 schema），`os.makedirs(log_dir)` 解析到 `<cwd>/logs/` 而非 `<workspace>/.reme/logs/`。`/logs/` 已 gitignore，**无实际危害**。上游修法依赖 §16.4。
 
-### 16.7 [P4] defense-in-depth：pid + port probe 在 ensure() 入口
+### 16.7 [P4] defense-in-depth：port probe 在 ensure() 入口
 
 运行期 reme 真死但 `handle.done` Promise 不触发（dsh-subprocess regression 防御）：
-- `ensure(cwd)` 入口检查 pid liveness (`process.kill(pid, 0)`) AND port probe (TCP `127.0.0.1:port`)
+- `ensure(cwd)` 入口检查 port probe (TCP `127.0.0.1:port`)；**0.1.5 起 managed 实例不再有 OS pid**，pid liveness 检查退化为仅 adopted（adopter 路径有 pid 时用 `process.kill(pid, 0)`）
 - 任一不通 → 丢弃 stale instance → 重新 spawn
 
 非紧急，**不进 v0.2**。

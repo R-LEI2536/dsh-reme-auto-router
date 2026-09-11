@@ -21,11 +21,17 @@ import type { Agent } from '@deepseek-ai/dsh-agent/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemeInstance } from './process-manager.ts'
 
-/** Shape the slash-command handler and the notifier both render from. */
+/**
+ * Shape the slash-command handler and the notifier both render from.
+ *
+ * `pid` is optional: managed instances never have one (0.1.5's plain
+ * SubprocessHandle no longer exposes `pid`), so the rendered status line
+ * degrades to "port N" when it is missing.
+ */
 export interface StatusSnapshot {
   readonly cwd: string
   readonly port: number
-  readonly pid: number
+  readonly pid?: number
   readonly ownership: 'managed' | 'adopted'
   readonly status: 'starting' | 'ready' | 'unavailable'
   readonly title: string
@@ -133,11 +139,21 @@ function formatHead(snapshot: StatusSnapshot): string {
 
 function formatTail(snapshot: StatusSnapshot): string | undefined {
   if (snapshot.status === 'starting') return undefined
-  const portPid = `port ${String(snapshot.port)} · pid ${String(snapshot.pid)}`
+  const portLine = formatPortLine(snapshot.port, snapshot.pid)
   if (snapshot.status === 'unavailable') {
-    return `${portPid} — ${snapshot.lastError ?? 'unknown failure'}`
+    return `${portLine} — ${snapshot.lastError ?? 'unknown failure'}`
   }
-  return portPid
+  return portLine
+}
+
+/**
+ * Render the "port N · pid M" suffix. Managed spawns have no pid
+ * (0.1.5 SubprocessHandle removed it), so the trailing "· pid M" is
+ * dropped when pid is undefined; adopted records keep it because the
+ * user may want to grep `ps` for the process they launched.
+ */
+function formatPortLine(port: number, pid: number | undefined): string {
+  return pid === undefined ? `port ${String(port)}` : `port ${String(port)} · pid ${String(pid)}`
 }
 
 /** POSIX basename for display; tolerates both `/` and `\` separators. */

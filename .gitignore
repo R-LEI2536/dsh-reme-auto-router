@@ -5,6 +5,10 @@
 
 # Dependencies
 node_modules/
+.pnpm-store/
+.pnpm-store/**
+/.npmrc
+pnpm-workspace.yaml
 
 # Logs
 *.log

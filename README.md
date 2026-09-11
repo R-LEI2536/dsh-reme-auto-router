@@ -45,9 +45,10 @@ reme-auto-router:
 ## 验证
 
 ```sh
-pnpm exec tsx --tsconfig ../tsconfig.base.json tests/import-check.mts
-pnpm exec tsx --tsconfig ../tsconfig.base.json tests/smoke-apply.mts
+pnpm run verify
 ```
+
+跑全部 4 个测试（`import-check` / `detector-state` / `state-store-race` / `smoke-apply`）+ `tsc --noEmit`。
 
 ## 已知限制
 

@@ -48,7 +48,8 @@ async function main(): Promise<void> {
       store.replaceRecord({
         cwd: '/race/cwd',
         port: 2333,
-        pid: 1000 + i,
+        // pid intentionally omitted: mirrors what ProcessManager.spawn now
+        // writes after DSH 0.1.5 removed SubprocessHandle.pid.
         ownership: 'managed',
         startedAt: '2026-09-07T00:00:00.000Z',
         lastUsedAt: '2026-09-07T00:00:00.000Z',
@@ -70,25 +71,34 @@ async function main(): Promise<void> {
   check('R.3 schemaVersion === 1', (parsed as { schemaVersion?: number }).schemaVersion === 1)
   check('R.4 lastScanAt > epoch (touchScan wrote)', typeof (parsed as { lastScanAt?: string }).lastScanAt === 'string')
 
-  // Second round: make sure a second wave also settles cleanly.
+  // Second round: make sure a second wave also settles cleanly. Mix in
+  // one record with a pid to confirm the optional field round-trips
+  // through the type guard alongside the pid-less majority.
   const wave2: Array<Promise<void>> = []
   for (let i = 0; i < 20; i++) {
-    wave2.push(
-      store.replaceRecord({
-        cwd: `/race/cwd-${String(i)}`,
-        port: 2333 + i,
-        pid: 2000 + i,
-        ownership: 'managed',
-        startedAt: '2026-09-07T00:00:00.000Z',
-        lastUsedAt: '2026-09-07T00:00:00.000Z',
-      }),
-    )
+    const rec: Parameters<StateStore['replaceRecord']>[0] = {
+      cwd: `/race/cwd-${String(i)}`,
+      port: 2333 + i,
+      ownership: 'managed',
+      startedAt: '2026-09-07T00:00:00.000Z',
+      lastUsedAt: '2026-09-07T00:00:00.000Z',
+    }
+    if (i === 7) rec.pid = 2007 // adopted-style record keeps the OS pid
+    wave2.push(store.replaceRecord(rec))
   }
   await Promise.all(wave2)
   const raw2 = await fs.readFile(stateFilePath(), 'utf8')
   const parsed2: unknown = JSON.parse(raw2)
   const instances = (parsed2 as { instances?: unknown[] }).instances ?? []
   check('R.5 second wave wrote 20 distinct cwds', instances.length === 20, `got ${String(instances.length)}`)
+
+  // R.6: pid-less records round-trip and one record with pid is preserved.
+  // Proves the optional pid field works in both directions under the
+  // DSH 0.1.5 type guard.
+  const pidPresent = instances.find((r) => (r as { cwd?: string }).cwd === '/race/cwd-7')
+  const pidAbsent = instances.find((r) => (r as { cwd?: string }).cwd === '/race/cwd-0')
+  check('R.6 adopted-style record (cwd-7) carries pid', (pidPresent as { pid?: number } | undefined)?.pid === 2007)
+  check('R.6 managed-style record (cwd-0) omits pid', (pidAbsent as { pid?: unknown } | undefined)?.pid === undefined)
 
   if (failed > 0) {
     console.error(`\n${failed} check(s) failed`)

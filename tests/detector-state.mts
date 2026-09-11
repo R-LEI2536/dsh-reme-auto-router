@@ -103,7 +103,8 @@ class ManagerStub {
       inst = {
         cwd,
         port: this.nextPort++,
-        pid: 10_000 + this.instances.size,
+        // pid intentionally omitted: mirrors what ProcessManager.spawn now
+        // writes after DSH 0.1.5 removed SubprocessHandle.pid.
         ownership: 'managed',
         status: 'starting',
         startedAt: '2026-09-07T00:00:00.000Z',

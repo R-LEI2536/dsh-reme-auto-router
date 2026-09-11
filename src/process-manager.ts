@@ -25,11 +25,18 @@ import type { StateStore, InstanceRecord } from './state-store.ts'
 /** Lifecycle state of one managed reme instance. */
 export type RemeStatus = 'starting' | 'ready' | 'unavailable'
 
-/** Live record kept in ProcessManager's map (extends persisted record). */
+/**
+ * Live record kept in ProcessManager's map (extends persisted record).
+ *
+ * `pid` is optional: 0.1.5's plain `SubprocessHandle` no longer exposes `pid`,
+ * so managed instances have `pid` undefined. Adopted instances still carry the
+ * OS pid (resolved by `ManualAdopter` via `lsof`), since the user-launched
+ * process is independent of our handle.
+ */
 export interface RemeInstance {
   cwd: string
   port: number
-  pid: number
+  pid?: number
   ownership: 'managed' | 'adopted'
   status: RemeStatus
   /** Last error message when status transitions to `unavailable`. */
@@ -148,10 +155,12 @@ export class ProcessManager {
       graceMs: 5_000,
     })
     const now = new Date().toISOString()
+    // 0.1.5 `SubprocessHandle` removed the `pid` getter; we intentionally
+    // leave `pid` undefined for managed instances. The `terminateTree`
+    // path uses the handle's own escalation, not the OS pid.
     const instance: RemeInstance = {
       cwd,
       port,
-      pid: handle.pid,
       ownership: 'managed',
       status: 'starting',
       handle,
@@ -185,7 +194,13 @@ export class ProcessManager {
         }
       })
       .catch(() => {
-        /* spawn-level failures: handle.pid === -1; treat as unavailable */
+        // Spawn-level failure: `handle.done` rejects when the provider
+        // could not start the process. As of DSH 0.1.5 the
+        // SubprocessHandle no longer exposes a `pid` sentinel to
+        // distinguish this from a normal exit — the done-promise
+        // rejection is the only signal. Absorb it; the instance is
+        // never installed in this branch, so a clean teardown is
+        // already implied.
       })
 
     this.emit(cwd, instance)
@@ -268,15 +283,17 @@ export class ProcessManager {
   }
 }
 
-/** Translate instance → persisted record. */
+/** Translate instance → persisted record. Omit `pid` when undefined so the
+ *  on-disk shape matches the optional field's intent (rather than writing
+ *  `null` / `-1` and forcing the schema to special-case them). */
 function toRecord(inst: RemeInstance): InstanceRecord {
   return {
     cwd: inst.cwd,
     port: inst.port,
-    pid: inst.pid,
     ownership: inst.ownership,
     startedAt: inst.startedAt,
     lastUsedAt: inst.lastUsedAt,
+    ...(inst.pid === undefined ? {} : { pid: inst.pid }),
   }
 }
 
@@ -284,11 +301,14 @@ function toRecord(inst: RemeInstance): InstanceRecord {
  * SIGTERM → graceMs → SIGKILL on the SubprocessHandle. The handle's
  * spec already encodes the escalation (its `graceMs` is the SIGTERM→
  * SIGKILL window), so this just fires the verb and awaits full tree exit.
+ *
+ * No `pid` sentinel: 0.1.5's plain SubprocessHandle no longer exposes `pid`,
+ * and `terminate()` is a no-op when the handle is already settled. We rely
+ * on the `done` promise chain in `spawn()` to surface spawn-level failures.
  */
 async function terminateTree(inst: RemeInstance): Promise<void> {
   const handle = inst.handle
   if (handle === undefined) return
-  if (handle.pid === -1) return
   handle.terminate()
   await handle.waitForExit(undefined)
 }

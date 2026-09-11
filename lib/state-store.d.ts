@@ -17,14 +17,25 @@
  */
 /** Ownership of one cwd's reme instance. */
 export type Ownership = 'managed' | 'adopted';
-/** One persisted record. */
+/**
+ * One persisted record.
+ *
+ * `pid` is optional: as of DSH 0.1.5, the plain `SubprocessHandle` no longer
+ * exposes `pid`, so managed instances persist without it. Adopted instances
+ * keep the OS pid because the ManualAdopter resolved it from `lsof` and the
+ * user may want to grep `ps` for the process they launched themselves.
+ *
+ * v1 on-disk records that always wrote `pid` are still readable: the type
+ * guard below treats the field as optional, so legacy state.json keeps
+ * working and only newly-spawned managed records omit it.
+ */
 export interface InstanceRecord {
     /** Canonical cwd path (realpath-normalised) this reme instance owns. */
     cwd: string;
     /** Port the reme HTTP service is listening on. */
     port: number;
-    /** Last observed OS pid of the reme process. */
-    pid: number;
+    /** Last observed OS pid of the reme process (omitted for managed spawns). */
+    pid?: number;
     /** Whether we own the lifecycle or just observed a user-launched process. */
     ownership: Ownership;
     /** ISO timestamp when the record was first persisted. */

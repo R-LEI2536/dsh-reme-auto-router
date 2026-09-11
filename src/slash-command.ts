@@ -67,7 +67,7 @@ export function registerRemeCommand(deps: SlashCommandDeps): () => void {
   }
   return commands.register({
     name: REME_COMMAND_NAME,
-    description: 'Show the active workspace reme instance (ready / starting / unavailable, port, pid).',
+    description: 'Show the active workspace reme instance (ready / starting / unavailable, port).',
     recordInput: false,
     handler: ({ agent: _agent }: { agent: Agent }) => {
       const cwd = deps.activeCwd()
