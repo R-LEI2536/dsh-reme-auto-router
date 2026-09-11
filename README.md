@@ -4,18 +4,38 @@
 
 ## 安装
 
-本仓库带两份 cordis 配置：
-
-- **`cordis.yml`** — 开发期覆盖：绝对路径指向 `src/index.ts`，方便直接改 .ts 后 reload。
-- **`cordis.patch.yml` + `package.json#dsh.bundle.patch`** — 发布版入口：`dsh plugin --profile web add` 走 npm 包名装载，发布到 GitHub 后可装 release tarball。
-
-本地开发快速装载（patch 走通后可用 `link:`）：
+### 生产安装（推荐）
 
 ```sh
-dsh plugin --profile web add "link:/path/to/dsh-reme-auto-router"
+dsh plugin --profile web add github:R-LEI2536/dsh-reme-auto-router
 ```
 
-调试阶段也可直接把 `cordis.yml` 路径加入 `~/.dsh/settings.yaml` 的 `dsh.bundle.layers`，或在 `cordis.yml` 上手动调整 `name:` 后让 dsh 加载。
+DSH 从 GitHub 拉取 release 仓库，载入 `lib/index.js`。
+
+**不要** 在用户目录或插件目录下手动执行 `npm install` / `pnpm install`：
+
+- `lib/` 已入仓，运行时不需要 node_modules
+- 本仓库 `package.json` 已删除 `prepare` 脚本，避免任何 npm 生命周期钩子（`preinstall` / `install` / `postinstall` / `prepare`）在用户侧自动执行
+- 如需升级：在用户目录重新跑一次 `dsh plugin add ...` 命令即可
+
+卸载：`dsh plugin --profile web remove dsh-reme-auto-router`
+
+### 开发者安装
+
+```sh
+git clone git@github.com:R-LEI2536/dsh-reme-auto-router.git
+cd dsh-reme-auto-router
+pnpm install
+pnpm run build
+pnpm run verify
+dsh plugin --profile web add "link:/absolute/path/to/dsh-reme-auto-router"
+```
+
+开发模式用 `cordis.yml`（绝对路径指向 `src/index.ts`），改 .ts 后 DSH 热重载生效。`cordis.patch.yml` 是发布版入口（被 `package.json#dsh.bundle.patch` 引用）。
+
+### 手动调试
+
+把 `cordis.yml` 路径加入 `~/.dsh/settings.yaml` 的 `dsh.bundle.layers`，或在 `cordis.yml` 上手动调整 `name:` 后让 dsh 加载。
 
 ## 设计要点
 

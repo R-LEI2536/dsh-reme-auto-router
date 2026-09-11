@@ -8,7 +8,6 @@
   "types": "./lib/index.d.ts",
   "files": [
     "lib",
-    "src",
     "cordis.patch.yml",
     "README.md",
     "docs"
@@ -25,8 +24,7 @@
     "test:detector": "tsx tests/detector-state.mts",
     "test:race": "tsx tests/state-store-race.mts",
     "test:apply": "tsx tests/smoke-apply.mts",
-    "verify": "pnpm run typecheck && pnpm run test:import && pnpm run test:detector && pnpm run test:race && pnpm run test:apply",
-    "prepare": "pnpm run build"
+    "verify": "pnpm run typecheck && pnpm run test:import && pnpm run test:detector && pnpm run test:race && pnpm run test:apply"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
