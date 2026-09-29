@@ -4,6 +4,33 @@ All notable changes to `dsh-reme-auto-router` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions adhere to [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] — route seam verified against dsh-reme-support 0.2.2
+
+### Changed
+
+- **Routing seam closed with the official side**: `remeMemory.setEndpoint(url)`
+  is now implemented by dsh-reme-support 0.2.2 (`8beca4b` + `43fbdf2`), so the
+  v0.3.0 contract is live. Routing in this release requires
+  `dsh-reme-support ≥ 0.2.2` mounted; when the service is absent or predates
+  `setEndpoint`, the coordinator still degrades to a one-shot warn and skips.
+- **Contract test**: new `tests/endpoint-coordinator.mts` locks our side of the
+  seam — ready instance routes via `setEndpoint(http://127.0.0.1:<port>)`;
+  non-ready/unknown cwd is silent; missing or malformed service warns exactly
+  once; a throwing `setEndpoint` is caught and warned without propagating.
+  Wired into `pnpm run verify` (`test:coordinator`).
+- **Docs**: `docs/reme-memory-setEndpoint-contract.md` marked implemented with a
+  contract-vs-implementation checklist (§4.1); README routing bullet and known
+  limitations updated (dsh-reme-support ≥ 0.2.2).
+
+### Known limitation (unchanged behaviour, documented)
+
+- Stale endpoint during downtime (P2): when an instance is idle-stopped,
+  crashes, or DSH restarts before respawn, the last endpoint stays published
+  until the next `ready` route or restart. `auto_memory`/`auto_dream`
+  `fetch failed` in that window (data is requeued). Revocation needs a
+  contract extension (`setEndpoint(undefined)` or a separate clear) and is
+  tracked as follow-up.
+
 ## [0.3.0] — DSH 0.1.7-rc.1+
 
 > **Host requirement**: this release targets DSH `0.1.7-rc.1` or later

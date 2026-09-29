@@ -41,7 +41,7 @@ dsh plugin --profile web add "link:/absolute/path/to/dsh-reme-auto-router"
 
 - **检测源**：active workspace 通过 `api-session/status`（running ⇄ idle）事件推断——任何 session 变 running 时其 `session.header.cwd` 即为 active workspace。
 - **进程生命周期**：惰性启动（首次切到该 workspace 时 spawn）+ idle timer（默认 15 min 后停止）+ pin 保护（永不 idle stop）+ DSH 退出时按 `killOnExit` 决定是否清理。
-- **路由协调**：通过官方 reme-memory 插件提供的 `remeMemory` 服务调用 `setEndpoint(url)`，让它的客户端 live 切到正确端口（DSH 0.1.7 起 replaced 旧的 `ctx.settings['reme-memory'].endpoint` 写入；不落盘、不覆盖用户配置）。
+- **路由协调**：通过官方 reme-memory 插件提供的 `remeMemory` 服务调用 `setEndpoint(url)`，让它的客户端 live 切到正确端口（DSH 0.1.7 起 replaced 旧的 `ctx.settings['reme-memory'].endpoint` 写入；不落盘、不覆盖用户配置）。官方侧已在 dsh-reme-support 0.2.2 实现 `remeMemory.setEndpoint`——路由需要 `dsh-reme-support ≥ 0.2.2` 挂载。
 - **reme 数据落点**：spawn 时不传 `workspace_dir`，由 reme 用默认的相对路径 `.reme/` + 我们 plugin 设的进程 cwd 解析为 `<workspace>/.reme/`。workspace 根目录不被 `daily/`、`metadata/`、`session/` 等目录污染，**所有 reme 数据落在一个隐藏目录 `.reme/` 下**。每个 workspace 一个独立的 reme 进程，cwd 锁死在 spawn 时刻，所以 `.reme/` 路径天然隔离。
 - **用户手动起的 reme**：探测端口 + 读 cmdline 区分所有权，标记为 adopted（只读不接管生命周期）。
 - **用户感知**：plugin 内部模拟 user 敲一次 `/reme` slash command，把 reme 状态以「命令结果卡片」形式推到 WebUI 聊天流——`command/done` 是 log-only event，**model 永远看不到**卡片文字，user 看到。同一 cwd 同一状态的卡片自动去重，状态变化时才冒新卡。
@@ -71,7 +71,7 @@ pinnedDirs: []                        # cwd realpath 列表，pin 的永不 idle
 pnpm run verify
 ```
 
-跑全部 4 个测试（`import-check` / `detector-state` / `state-store-race` / `smoke-apply`）+ `tsc --noEmit`。
+跑全部 5 个测试（`import-check` / `detector-state` / `state-store-race` / `smoke-apply` / `endpoint-coordinator`）+ `tsc --noEmit`。
 
 ## 已知限制
 
@@ -81,6 +81,7 @@ pnpm run verify
 - 自动推送的去重粒度是「同一 cwd 同一渲染文本」；快速切换 workspace 时每个目标 cwd 各推一次（不会重复推同一 cwd）
 - Windows 不支持（manual-adopter 用 `lsof` + `/proc/<pid>/cmdline`，macOS/Linux only）
 - 没有 user-launched WebUI chip——chat 卡片是唯一的 user 感知通道
-- 路由协调依赖官方 reme-memory 插件暴露 `remeMemory.setEndpoint`（dsh-reme-support ≥ 0.1.7 配套版本）；未挂载时跳过写入并 warn 一次
+- 路由协调依赖官方 reme-memory 插件暴露 `remeMemory.setEndpoint`——dsh-reme-support ≥ 0.2.2 已提供；未挂载或旧版本时跳过路由写入并 warn 一次（`remeMemory service is unavailable`）
+- **stale endpoint（定性，P2）**：实例 idle stop / 异常退出 / DSH 重启未 respawn 期间，最后一次 endpoint 保留指向已停端口，直到下次实例 `ready` 重新路由或 DSH 重启。窗口内 `reme_search` 报错（用户可见）、`auto_memory`/`auto_dream` `fetch failed`（数据不丢，下批重投成功）。与 0.1.5 时代行为一致，本期不改；撤销需契约扩展（`setEndpoint(undefined)` 或独立 clear），记录为后续项
 
 详细设计见 [`docs/design.md`](docs/design.md)。
