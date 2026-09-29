@@ -27,7 +27,7 @@
 | 自己写状态页 UI | 官方 `ReMeStatusPage` 已经存在 |
 | 主动健康检查（probe port） | reme 自己报错接住；状态行只反映"我们最后知道的事实"，不撒谎 |
 | 在状态行暴露端口号给用户 | 用户不需要；模型端口透传走 settings.endpoint |
-| 模型工具 `reme_pin` / workspace 行右键 Pin | 暂缓，v1 走 settings.yaml + WebUI 设置页 |
+| 模型工具 `reme_pin` / workspace 行右键 Pin | 暂缓；v1 走插件 Config（设置页 / 组合配置） |
 | 修改 `bash-local`、改官方 reme 插件源码 | 零侵入，跨版本升级不受影响 |
 
 ---
@@ -39,11 +39,11 @@
 | 1 | 检测源：`api-session/status` running ⇄ idle 事件 | `WorkspaceDetector` 订阅 `ctx.on('api-session/status', ...)` |
 | 2 | 进程生命周期：惰性启动 + idle 15min | `ProcessManager` + `ctx.timer.timeout` |
 | 3 | 端口范围：2333..2400 顺序分配 | `StateStore.allocatePort(base, range)` |
-| 4 | Pinned 永停、killOnExit 默认 true | `settings.yaml` 的 `reme-auto-router.pinnedDirs` + `killOnExit` |
+| 4 | Pinned 永停、killOnExit 默认 true | 插件 `Config` 的 `pinnedDirs` + `killOnExit`（设置页 / 组合配置） |
 | 5 | 用户手动实例：检测 + 认领不接管 | `ManualInstanceAdopter` 扫端口 + 读 cmdline |
 | 6 | 状态行：3 状态、英文、`reme:` 前缀 | `StatusSection.text()` lazy 求值 |
 | 7 | 健康检查：依赖 `reme_search` 自然失败 | 不做主动 probe |
-| 8 | 设置 namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突） | `installSection` |
+| 8 | 配置模型：插件 Config schema + `.volatile()` 字段（DSH 0.1.7）；设置页由 settings 服务自动生成 | `Config` 导出 + `settings-schema.ts` |
 | 9 | Shutdown：SIGTERM → grace → SIGKILL | `waitForIdleBeforeShutdown` 默认 false，可选 true |
 | 10 | 不注册 Tool | `reme_search` 由官方提供 |
 
@@ -113,11 +113,11 @@ reme: ready (project-a)        ← 端口 bind 之后
 
 ### 5.5 用户旅程 5：pin 一个工作区
 
-> 用户在 settings.yaml 加一行：
+> 用户在 WebUI 设置页（volatile Config 自动生成）把 cwd 加入 pinnedDirs，或部署方在
+> 组合配置里写：
 > ```yaml
-> reme-auto-router:
->   pinnedDirs:
->     - /Users/x/projects/never-stop-this
+> pinnedDirs:
+>   - /Users/x/projects/never-stop-this
 > ```
 
 **行为**：
@@ -195,7 +195,7 @@ dsh-reme-auto-router/
 │   └── design.md                                    # 本文件
 ├── src/
 │   ├── index.ts                                     # apply() 主入口
-│   ├── settings-schema.ts                           # reme-auto-router namespace
+│   ├── settings-schema.ts                           # 插件 Config schema（volatile 字段）
 │   ├── state-store.ts                               # ~/.dsh/plugin-data/reme-auto-router/state.json
 │   ├── process-manager.ts                           # spawn / kill / idle timer
 │   ├── workspace-detector.ts                        # api-session/status 订阅 + activeSessionId
@@ -212,23 +212,28 @@ dsh-reme-auto-router/
 
 ---
 
-## 8. Settings schema
+## 8. 配置模型（DSH 0.1.7：volatile Config）
+
+插件 `Config` schema（`src/settings-schema.ts`）的全部字段标 `.volatile()`；DSH 0.1.7 的
+settings 服务据此在 WebUI 自动生成设置表单，编辑 live 生效并持久化到当前
+profile 的 `cordis.patch.yml`（entry `dsh-reme-auto-router` 的 `config` 层）。
+`apply` 从 `config` 参数的 volatile 引用（`.get()`）装配配置快照，无需重启。
 
 ```yaml
-reme-auto-router:
-  killOnExit: true              # bool, 默认 true
-  shutdownGraceMs: 3000         # number, SIGTERM→SIGKILL 间隔
-  waitForIdleBeforeShutdown: false  # bool, 是否先等 reme idle
-  maxShutdownWaitMs: 8000       # number, waitForIdle 总上限
-  idleTimeoutMs: 900000         # number, 默认 15 分钟
-  adoptManual: true             # bool, 是否认领用户手起实例
-  ports:
-    base: 2333                  # number
-    range: 67                   # number (2333..2400)
-  pinnedDirs: []                # string[], cwd realpath
+# 有效配置快照（默认值；webui 设置页编辑后写 cordis.patch.yml）
+killOnExit: true              # bool, 默认 true
+shutdownGraceMs: 3000         # number, SIGTERM→SIGKILL 间隔
+waitForIdleBeforeShutdown: false  # bool, 是否先等 reme idle
+maxShutdownWaitMs: 8000       # number, waitForIdle 总上限
+idleTimeoutMs: 900000         # number, 默认 15 分钟
+adoptManual: true             # bool, 是否认领用户手起实例
+ports:
+  base: 2333                  # number
+  range: 67                   # number (2333..2400)
+pinnedDirs: []                # string[], cwd realpath
 ```
 
-settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）。
+（0.1.5 的 `reme-auto-router` settings namespace 与 `settings.yaml` 一次性导入机制已随 DSH 0.1.7 移除。）
 
 ---
 
@@ -278,8 +283,8 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 
 | 变化点 | 影响范围 | 兼容性 |
 |---|---|---|
-| 新增 settings namespace `reme-auto-router` | 用户 `~/.dsh/settings.yaml` 多一个顶级 key | 完全新增 |
-| 写入 `reme-memory.endpoint` | 官方 reme 插件 endpoint 字段会被覆盖 | 用户手编的 endpoint 在 active workspace 切换时会被覆盖——这是有意行为 |
+| 配置迁入插件 `Config`（volatile 字段） | WebUI 设置页自动生成表单；值写 `<profile>/cordis.patch.yml` | DSH 0.1.7 起；0.1.5 的 `settings.yaml` 不再读取 |
+| 经 `remeMemory.setEndpoint(url)` 下发 endpoint | 官方 reme 插件客户端 live 重配 | live 不落盘；官方插件未暴露该方法时跳过 + warn 一次 |
 | `~/.dsh/plugin-data/reme-auto-router/state.json` | 新文件 | 完全新增 |
 | **不**注册 system prompt section | model-visible prompt 不变 | 不污染 model 上下文 |
 | 注册 `commands.register({ name: 'reme', ... })` + `ctx.commands.execute(agent, '/reme', ...)` 推卡片 | 用户 chat 流出现「命令结果卡片」 | log-only 事件，model 看不到 |
@@ -306,7 +311,7 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 
 ## 12. 已知限制
 
-- **WebUI 设置页未实现**：v1 `reme-auto-router` namespace 仅在 `~/.dsh/settings.yaml` 手编生效（v0.2 计划做）
+- **WebUI 设置页**：DSH 0.1.7 起由 settings 服务按 volatile Config 自动生成（v0.3.0 落地）
 - **不做主动健康检查**：reme 自身错误由 `reme_search` 工具报错接住
 - **多 tab 同时活跃不同 workspace**：取最近一次活跃为 active cwd
 - **不预先启动 pinned**：pin 的语义是"保活"，不是"预加载"
@@ -340,7 +345,7 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 每个 .ts 文件对应本设计的一个子系统：
 
 **已完成（v0.1.0）**：
-- settings-schema.ts — reme-auto-router namespace
+- settings-schema.ts — 插件 Config schema（volatile 字段）
 - state-store.ts — atomic JSON write + port 分配
 - process-manager.ts — spawn / idle / kill / 三态切换；**v0.1.0 起 spawn argv 不传 `workspace_dir=`，由 reme 默认值 `.reme/` + plugin 设的 cwd 解析到 `<workspace>/.reme/`**
 - endpoint-coordinator.ts — 写 `reme-memory.endpoint`
@@ -417,15 +422,12 @@ settings namespace：`reme-auto-router`（不和官方 `reme-memory` 冲突）�
 
 **取舍**：切 workspace 期间 UX 短暂延迟（"切换中..."），但**数据正确性**——窗口期内 reme 调用仍走老 reme，**老 reme 是 ready 的、数据正确**。比 v0.1.0 的"数据错位"是质的改进。
 
-### 16.2 [P1] WebUI 设置页（`reme-auto-router` namespace 暴露 UI）
+### 16.2 [已由 DSH 0.1.7 免费关闭] WebUI 设置页
 
-v1 只支持 `~/.dsh/settings.yaml` 手编。补上：
-- `cordis.patch.yml` 挂 `@deepseek-ai/dsh-client-ui-settings-plugins` 入口
-- 写 client 组件：渲染 settings section（boolean 开关 + 数字 input + 数组（pinnedDirs））
-- 表单 schema 复用 `src/settings-schema.ts` 的 zod schema（已存在）
-- **0.1.5 panel API**：根 slot 改为 `sidebar.panellist`（侧栏条目挂载点）+ `main`（主区面板）；旧的裸 `conversation` slot 与 `conversation.details.tool` 已删除。设置项走 `settings.section` / `settings.plugin.item`，仍可用——这两个细粒度 slot 在 0.1.5 保留
-
-约 200-300 行 client.tsx。
+v1 只支持 `~/.dsh/settings.yaml` 手编。DSH 0.1.7 起 settings 服务根据插件
+`Config` schema 的 `.volatile()` 字段**自动生成设置页**（无需 client 插件），
+编辑 live 生效并写入 profile 的 `cordis.patch.yml`。本插件已随 v0.3.0 迁移到该模型。
+（旧的 `settings.section` / `settings.plugin.item` client 席位方案不再需要。）
 
 ### 16.3 [P2] publish 链路 + GitHub Actions
 
@@ -445,7 +447,7 @@ v1 只支持 `~/.dsh/settings.yaml` 手编。补上：
 
 ### 16.5 [P3] README 增补手编示例 + 故障排查
 
-- 加一段"`~/.dsh/settings.yaml` 的完整手编示例 + 各字段释义"
+- 加一段"配置字段完整释义"（v0.3.0 已由 README「配置（插件 Config）」节覆盖）
 - 故障排查节："切 workspace 后立刻点立即整理 → 数据错位"（指向 §16.1）
 - "reme 数据落 `<workspace>/.reme/`" + "`logs/` 是 reme 硬编码不在 `.reme/`"（指向 §11）
 

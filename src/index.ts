@@ -8,7 +8,8 @@
  *
  * Runtime responsibilities wired here:
  *   1. Load the durable state record (`StateStore.load`)
- *   2. Register the `reme-auto-router` settings section
+ *   2. Resolve the live plugin configuration from the volatile
+ *      `Config` fields (DSH 0.1.7 model — no settings namespace)
  *   3. Build the live subsystems (manager, detector, coordinator,
  *      adopter)
  *   4. Register `/reme` slash command and wire the PushNotifier
@@ -24,11 +25,11 @@
  * @module reme-auto-router
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemeAutoRouterSettings } from './settings-schema.ts'
-import { DEFAULT_SETTINGS, REME_AUTO_ROUTER_NAMESPACE, SettingsConfig as SettingsConfigSchema } from './settings-schema.ts'
+import { DEFAULT_SETTINGS, SettingsConfig as SettingsConfigSchema } from './settings-schema.ts'
 import { StateStore } from './state-store.ts'
 import { ProcessManager } from './process-manager.ts'
 import { WorkspaceDetector } from './workspace-detector.ts'
@@ -40,13 +41,29 @@ import { PushNotifier, basename } from './push-notifier.ts'
 
 export const name = 'reme-auto-router'
 
-export const inject = ['settings', 'subprocess', 'sessions', 'systemPrompt', 'timer', 'commands']
+export const inject = ['subprocess', 'sessions', 'systemPrompt', 'timer', 'commands']
 
-/** Plugin Config — deployment-time overrides for the same schema users edit in settings.yaml. */
+/** Plugin Config — deployment-time overrides for the same schema users edit in the settings page. */
 export const Config = SettingsConfigSchema
 
-/** Deployment-time Config value type. Identical to {@link RemeAutoRouterSettings}. */
-export type RemeAutoRouterConfig = RemeAutoRouterSettings
+/**
+ * Deployment-time Config value type: the `apply(config)` argument.
+ *
+ * Volatile fields arrive as `Volatile<T>` references — `.get()` returns
+ * the effective value including live profile-patch edits, so per-call
+ * reads (see {@link getSettings}) pick up settings-page changes without
+ * a restart. Mirrors {@link RemeAutoRouterSettings} field-for-field.
+ */
+export interface RemeAutoRouterConfig {
+  killOnExit: Volatile<boolean>
+  shutdownGraceMs: Volatile<number>
+  waitForIdleBeforeShutdown: Volatile<boolean>
+  maxShutdownWaitMs: Volatile<number>
+  idleTimeoutMs: Volatile<number>
+  adoptManual: Volatile<boolean>
+  ports: Volatile<{ base: number; range: number }>
+  pinnedDirs: Volatile<string[]>
+}
 
 export async function apply(
   ctx: Context,
@@ -60,24 +77,29 @@ export async function apply(
   const store = new StateStore()
   await store.load(logger)
 
-  // 2. installSection drives both the user layer (settings.yaml) and
-  //    the composition `base` (the plugin Config).
-  installSettingsSection(ctx, config)
+  // 2. Live configuration thunk: volatile references are updated by the
+  //    runtime as the profile user layer changes, so every call
+  //    assembles a fresh plain snapshot — settings edits propagate
+  //    without restart (same guarantee the old ctx.settings.get path
+  //    gave, under the DSH 0.1.7 volatile-Config model).
+  const getSettings = (): RemeAutoRouterSettings => ({
+    killOnExit: config.killOnExit.get(),
+    shutdownGraceMs: config.shutdownGraceMs.get(),
+    waitForIdleBeforeShutdown: config.waitForIdleBeforeShutdown.get(),
+    maxShutdownWaitMs: config.maxShutdownWaitMs.get(),
+    idleTimeoutMs: config.idleTimeoutMs.get(),
+    adoptManual: config.adoptManual.get(),
+    ports: { ...config.ports.get() },
+    pinnedDirs: [...config.pinnedDirs.get()],
+  })
 
-  // 3. Resolver used by every downstream subsystem on every call so
-  //    settings edits propagate without restart.
-  const getSettings = (): RemeAutoRouterSettings => {
-    const raw = ctx.settings.get(REME_AUTO_ROUTER_NAMESPACE)
-    return isCompleteSettings(raw) ? raw : mergeSettings(config)
-  }
-
-  // 4. ProcessManager is the source of truth for live reme instances.
+  // 3. ProcessManager is the source of truth for live reme instances.
   const manager = new ProcessManager({ ctx, settings: getSettings, store, logger })
 
-  // 5. Detector and coordinator: detector owns the
+  // 4. Detector and coordinator: detector owns the
   //    preparing→active state machine (v0.2 #0 fix); coordinator
-  //    routes the ready instance's port to
-  //    ctx.settings['reme-memory'].
+  //    routes the ready instance's port to the official reme-memory
+  //    plugin via its `remeMemory` service.
   const detector = new WorkspaceDetector({ ctx, manager, logger })
   const coordinator = new EndpointCoordinator({
     ctx,
@@ -86,7 +108,7 @@ export async function apply(
     logger,
   })
 
-  // 6. PushNotifier: chat-flow user-visible card on every state
+  // 5. PushNotifier: chat-flow user-visible card on every state
   //    change. resolveAgent looks up the Agent by sessionId.
   const agents = ctx.get('agents') as
     | { get(id: SessionId): Agent | undefined }
@@ -97,7 +119,7 @@ export async function apply(
     logger,
   })
 
-  // 7. Wire the trigger sources. Two detector events:
+  // 6. Wire the trigger sources. Two detector events:
   //    - onPreparingCwdChanged: a new session entered the
   //      `preparing` state — spawn its reme and push a "starting…"
   //      card so the user sees the switch is in progress.
@@ -137,23 +159,23 @@ export async function apply(
     }
   })
 
-  // 8. Manual adopter periodically scans the port range for
+  // 7. Manual adopter periodically scans the port range for
   //    user-launched reme processes and adds them to the manager.
   const adopter = new ManualAdopter({ ctx, manager, store, settings: getSettings, logger })
 
-  // 9. Register the slash command so the user can query state.
+  // 8. Register the slash command so the user can query state.
   const disposeSlashCommand = registerRemeCommand({
     ctx,
     manager,
     activeCwd: () => detector.activeCwd(),
   })
 
-  // 10. Start the live subsystems.
+  // 9. Start the live subsystems.
   detector.start()
   coordinator.start()
   adopter.start()
 
-  // 11. Dispose chain: stop subscriptions, drain the coordinator,
+  // 10. Dispose chain: stop subscriptions, drain the coordinator,
   //     run shutdown, then dispose the slash command and notifier.
   return async () => {
     detector.stop()
@@ -166,46 +188,6 @@ export async function apply(
   }
 }
 
-/**
- * Register the `reme-auto-router` settings namespace. The plugin
- * Config becomes the composition `base`.
- */
-function installSettingsSection(ctx: Context, config: RemeAutoRouterConfig): void {
-  const entry: RemeAutoRouterSettings = mergeSettings(config)
-  ctx.settings.installSection(
-    ctx,
-    REME_AUTO_ROUTER_NAMESPACE,
-    SettingsConfigSchema,
-    entry,
-    {
-      setSource: () => undefined,
-      onChange: () => undefined,
-    },
-  )
-}
-
-/** Combine the plugin Config with schema defaults into a full Settings object. */
-function mergeSettings(config: Partial<RemeAutoRouterSettings>): RemeAutoRouterSettings {
-  return {
-    ...DEFAULT_SETTINGS,
-    ...config,
-    ports: { ...DEFAULT_SETTINGS.ports, ...config.ports },
-    pinnedDirs: config.pinnedDirs ?? DEFAULT_SETTINGS.pinnedDirs,
-  }
-}
-
-function isCompleteSettings(value: unknown): value is RemeAutoRouterSettings {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<RemeAutoRouterSettings>
-  return (
-    typeof candidate.killOnExit === 'boolean' &&
-    typeof candidate.idleTimeoutMs === 'number' &&
-    candidate.ports !== undefined &&
-    typeof candidate.ports.base === 'number' &&
-    typeof candidate.ports.range === 'number'
-  )
-}
-
-// Re-export the schema and namespace for downstream tests and tools.
-export { DEFAULT_SETTINGS, REME_AUTO_ROUTER_NAMESPACE, SettingsConfigSchema as SettingsConfig }
+// Re-export the schema and defaults for downstream tests and tools.
+export { DEFAULT_SETTINGS, SettingsConfigSchema as SettingsConfig }
 export type { RemeAutoRouterSettings }

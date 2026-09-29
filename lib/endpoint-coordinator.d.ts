@@ -1,12 +1,14 @@
 /**
  * reme-auto-router — EndpointCoordinator: publish the active cwd's
- * reme port to the official `reme-memory` settings namespace.
+ * reme port to the official `reme-memory` plugin.
  *
  * The coordinator owns one write path: when the active workspace
- * cwd has a ready reme instance, write its endpoint URL to
- * `ctx.settings['reme-memory']`. The official reme-memory plugin
- * (when mounted) reads that endpoint and routes its HTTP client to
- * the active workspace's reme process.
+ * cwd has a ready reme instance, it calls the live endpoint setter on
+ * the `remeMemory` service provided by the official reme-memory
+ * plugin (dsh-reme-support). That routes the plugin's HTTP client to
+ * the active workspace's reme process without persisting anything —
+ * the same live, non-durable semantics the old
+ * `ctx.settings['reme-memory'].endpoint` write had under DSH 0.1.5.
  *
  * Trigger sources (subscribed once at construction):
  *   - `manager.onStateChange(...)` — fires when any instance reaches
@@ -15,15 +17,22 @@
  *     cwd changes; we route the new cwd regardless of which event
  *     made it ready
  *
- * Failures (settings service missing, `reme-memory` namespace not
- * registered, the write itself rejecting) are surfaced as one warn
- * log per cause and the function returns. We never throw into the
- * host event loop.
+ * Failures (remeMemory service missing, the call itself rejecting)
+ * are surfaced as one warn log per cause and the function returns.
+ * We never throw into the host event loop.
  *
  * @module reme-auto-router/endpoint-coordinator
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { ProcessManager } from './process-manager.ts';
+/**
+ * Live endpoint sink the official reme-memory plugin exposes on its
+ * `remeMemory` service. `setEndpoint` repoints the HTTP client at the
+ * given URL at runtime; it must not touch persisted configuration.
+ */
+export interface RemeMemoryEndpointSink {
+    setEndpoint(url: string): void;
+}
 /** Cwd value the detector exposes; undefined when no session runs. */
 export type ActiveCwdProvider = () => string | undefined;
 /** Logger surface this module depends on. */
@@ -53,8 +62,7 @@ export declare class EndpointCoordinator {
     private readonly logger;
     private readonly formatEndpoint;
     /** Per-cause one-shot warn flag so the log never spams. */
-    private warnedNoSettings;
-    private warnedNoNamespace;
+    private warnedNoSink;
     /** Disposer for the manager state-change subscription. */
     private stateChangeDispose;
     /** Currently scheduled route call; subsequent ones chain onto the tail. */

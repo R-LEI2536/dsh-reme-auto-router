@@ -45,8 +45,11 @@ source under `src/` for how each concept is realised.
 ## Routing
 
 - **endpoint** — The HTTP base URL the upstream `reme-memory` client
-  uses to talk to a reme process. Written by `endpoint-coordinator`
-  into `ctx.settings['reme-memory'].endpoint`.
+  uses to talk to a reme process. Delivered by `endpoint-coordinator`
+  through the `remeMemory` service's `setEndpoint(url)` (DSH 0.1.7;
+  replaced the removed `ctx.settings['reme-memory'].endpoint` write).
+  Live-only — never persisted, so the user's own endpoint
+  configuration is never clobbered.
 - **prepare window** — The interval between `preparing` and `ready`
   for a freshly-spawned workspace. During this window the
   `endpoint-coordinator` keeps the previous ready instance's endpoint

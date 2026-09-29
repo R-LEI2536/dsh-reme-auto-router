@@ -12,7 +12,7 @@
 
 import { StateStore } from '../src/state-store.ts'
 import { ProcessManager } from '../src/process-manager.ts'
-import { SettingsConfig, REME_MANAGED_MARKER, REME_AUTO_ROUTER_NAMESPACE, DEFAULT_SETTINGS } from '../src/settings-schema.ts'
+import { SettingsConfig, REME_MANAGED_MARKER, DEFAULT_SETTINGS } from '../src/settings-schema.ts'
 import { renderStatusLine, basename } from '../src/push-notifier.ts'
 import { registerRemeCommand, REME_COMMAND_NAME } from '../src/slash-command.ts'
 import { WorkspaceDetector } from '../src/workspace-detector.ts'
@@ -27,7 +27,6 @@ const expected = [
   ['ProcessManager', typeof ProcessManager],
   ['SettingsConfig', typeof SettingsConfig],
   ['REME_MANAGED_MARKER', typeof REME_MANAGED_MARKER],
-  ['REME_AUTO_ROUTER_NAMESPACE', typeof REME_AUTO_ROUTER_NAMESPACE],
   ['DEFAULT_SETTINGS', typeof DEFAULT_SETTINGS],
   ['renderStatusLine', typeof renderStatusLine],
   ['basename', typeof basename],
@@ -60,13 +59,12 @@ if (entry.name !== 'reme-auto-router') {
 }
 
 const inject = entry.inject as readonly string[]
-if (!inject.includes('settings') || !inject.includes('subprocess') || !inject.includes('sessions')) {
+if (!inject.includes('subprocess') || !inject.includes('sessions')) {
   console.error(`FAIL entry.inject missing required services: ${inject.join(',')}`)
   failed++
 }
-
-if (REME_AUTO_ROUTER_NAMESPACE !== 'reme-auto-router') {
-  console.error(`FAIL REME_AUTO_ROUTER_NAMESPACE mismatch: ${REME_AUTO_ROUTER_NAMESPACE}`)
+if (inject.includes('settings')) {
+  console.error(`FAIL entry.inject still requires 'settings' (DSH 0.1.7 removed the namespace API): ${inject.join(',')}`)
   failed++
 }
 

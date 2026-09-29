@@ -4,13 +4,13 @@
  * Boots the plugin against a minimal Cordis context with stub services for
  * every injected dependency. Verifies:
  *
- *   1. apply() resolves and the section is registered
- *   2. ctx.settings.get('reme-auto-router') returns the merged defaults
- *   3. The `/reme` slash command is registered on ctx.commands
- *   4. A stage-then-emit `api-session/status(_, true)` round-trip produces a
+ *   1. apply() resolves and the Config schema defaults match the exported
+ *      DEFAULT_SETTINGS snapshot (the DSH 0.1.7 settings-page source)
+ *   2. The `/reme` slash command is registered on ctx.commands
+ *   3. A stage-then-emit `api-session/status(_, true)` round-trip produces a
  *      commands.execute call (the auto-push path), proving the chat card
  *      path is wired end-to-end without a real subprocess
- *   5. The returned async disposer runs cleanly
+ *   4. The returned async disposer runs cleanly
  *
  * Does NOT exercise the live subprocess path, the manual-adopter scan, or
  * the shutdown sequence — those rely on real reme binaries or platform
@@ -33,9 +33,8 @@ process.env.DSH_HOME = sandboxHome
 import { Service, Context } from '@deepseek-ai/cordis'
 import TimerService from '@deepseek-ai/cordis-plugin-timer'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
-import { MemorySettings } from './memory-settings.ts'
 import { apply, name, inject, Config } from '../src/index.ts'
-import { DEFAULT_SETTINGS, REME_AUTO_ROUTER_NAMESPACE } from '../src/settings-schema.ts'
+import { DEFAULT_SETTINGS } from '../src/settings-schema.ts'
 
 class SubprocessStub extends Service {
   static override name = 'subprocess'
@@ -129,8 +128,6 @@ interface BootContext {
 
 async function boot(): Promise<BootContext> {
   const ctx = new Context()
-  const settings = await ctx.plugin(MemorySettings, { doc: {} })
-  void settings
   await ctx.plugin(TimerService)
   await ctx.plugin(SessionsStub)
   const sessions = ctx.get('sessions') as unknown as SessionsStub
@@ -153,24 +150,43 @@ async function boot(): Promise<BootContext> {
   }
 }
 
-async function main(): Promise<void> {
-  const { ctx, dispose, sessions, agents, commands } = await boot()
-
-  const resolved = ctx.settings.get(REME_AUTO_ROUTER_NAMESPACE) as Record<string, unknown> | undefined
-  if (resolved === undefined) {
-    throw new Error(`settings namespace '${REME_AUTO_ROUTER_NAMESPACE}' is not registered`)
+/**
+ * Schema-default parity check: under the DSH 0.1.7 model the settings page
+ * is generated from the plugin `Config` schema, and `apply` reads the same
+ * schema via the volatile `config` argument — so the schema defaults are
+ * now the single source of truth. Assert they agree with the exported
+ * `DEFAULT_SETTINGS` snapshot (kept as the documented fallback).
+ */
+function checkSchemaDefaults(): void {
+  const dict = (Config as unknown as { dict: Record<string, { meta?: { default?: unknown } }> }).dict
+  const scalarKeys = [
+    'killOnExit',
+    'shutdownGraceMs',
+    'waitForIdleBeforeShutdown',
+    'maxShutdownWaitMs',
+    'idleTimeoutMs',
+    'adoptManual',
+  ] as const
+  for (const key of scalarKeys) {
+    const schemaDefault = dict[key]?.meta?.default
+    if (schemaDefault !== DEFAULT_SETTINGS[key]) {
+      throw new Error(`Config schema default for '${key}' diverges from DEFAULT_SETTINGS (schema=${JSON.stringify(schemaDefault)}, expected=${JSON.stringify(DEFAULT_SETTINGS[key])})`)
+    }
   }
-  if (resolved['killOnExit'] !== DEFAULT_SETTINGS.killOnExit) {
-    throw new Error(`killOnExit mismatch: got ${JSON.stringify(resolved['killOnExit'])}`)
-  }
-  if (resolved['idleTimeoutMs'] !== DEFAULT_SETTINGS.idleTimeoutMs) {
-    throw new Error(`idleTimeoutMs mismatch: got ${JSON.stringify(resolved['idleTimeoutMs'])}`)
-  }
-  const ports = resolved['ports'] as { base?: number; range?: number } | undefined
+  const ports = dict['ports']?.meta?.default as { base?: number; range?: number } | undefined
   if (ports?.base !== DEFAULT_SETTINGS.ports.base || ports?.range !== DEFAULT_SETTINGS.ports.range) {
-    throw new Error(`ports mismatch: got ${JSON.stringify(ports)}`)
+    throw new Error(`Config schema default for 'ports' diverges from DEFAULT_SETTINGS (schema=${JSON.stringify(ports)}, expected=${JSON.stringify(DEFAULT_SETTINGS.ports)})`)
   }
-  console.log(`ok   settings namespace '${REME_AUTO_ROUTER_NAMESPACE}' registered with defaults`)
+  const pinnedDirs = dict['pinnedDirs']?.meta?.default
+  if (!Array.isArray(pinnedDirs) || pinnedDirs.length !== 0) {
+    throw new Error(`Config schema default for 'pinnedDirs' diverges from DEFAULT_SETTINGS (schema=${JSON.stringify(pinnedDirs)}, expected=[])`)
+  }
+  console.log('ok   Config schema defaults match DEFAULT_SETTINGS')
+}
+
+async function main(): Promise<void> {
+  checkSchemaDefaults()
+  const { ctx, dispose, sessions, agents, commands } = await boot()
 
   // Confirm the slash command was registered: a handler must be set on the
   // commands stub. Calling it via the commands service is what the

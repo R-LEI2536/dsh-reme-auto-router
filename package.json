@@ -1,6 +1,6 @@
 {
   "name": "dsh-reme-auto-router",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": false,
   "description": "DeepSeek Harness plugin — auto-route reme_search to a workspace-bound reme instance.",
   "type": "module",
@@ -26,15 +26,25 @@
     "test:apply": "tsx tests/smoke-apply.mts",
     "verify": "pnpm run typecheck && pnpm run test:import && pnpm run test:detector && pnpm run test:race && pnpm run test:apply"
   },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.4",
+    "@deepseek-ai/cordis-plugin-timer": "^1.1.6",
+    "@deepseek-ai/dsh-agent": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-commands": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-session": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-subprocess": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.7-rc.1",
+    "@deepseek-ai/schemastery": ">=3.18.4"
+  },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/cordis-plugin-timer": "1.1.4",
-    "@deepseek-ai/dsh-agent": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-session": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-settings": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-subprocess": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-system-prompt": "^0.1.5-rc.1",
-    "@deepseek-ai/schemastery": "3.18.2",
+    "@deepseek-ai/cordis": ">=4.0.4",
+    "@deepseek-ai/cordis-plugin-timer": "^1.1.6",
+    "@deepseek-ai/dsh-agent": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-commands": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-session": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-subprocess": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.7-rc.1",
+    "@deepseek-ai/schemastery": ">=3.18.4",
     "@types/node": "^22.15.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.2"

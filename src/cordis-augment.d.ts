@@ -3,19 +3,23 @@
  * `Events` types for the services and event names this plugin reads from.
  *
  * In the monorepo these signatures live in their respective service
- * packages (dsh-settings, dsh-subprocess, dsh-session,
- * cordis-plugin-timer, dsh-api-session-controller/types, …) and are
- * loaded implicitly when source files import anything from those
- * packages. The standalone checkout imports only the types it uses, so
- * those augmentations never trigger; we vendor the slice we need here
- * to keep the plugin self-describing.
+ * packages (dsh-subprocess, dsh-session, cordis-plugin-timer,
+ * dsh-api-session-controller/types, …) and are loaded implicitly when
+ * source files import anything from those packages. The standalone
+ * checkout imports only the types it uses, so those augmentations never
+ * trigger; we vendor the slice we need here to keep the plugin
+ * self-describing.
  *
  * Each `interface Context { ... }` line below must match the runtime
  * shape of the corresponding service — the cordis proxy resolves names
  * dynamically, so a typo here would fail silently at runtime.
+ *
+ * No `settings` declaration: as of DSH 0.1.7 this plugin no longer
+ * consumes `ctx.settings` (configuration lives in the volatile `Config`
+ * schema; settings-page forms are generated host-side), so the type is
+ * intentionally absent.
  */
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { SettingsProvider } from '@deepseek-ai/dsh-settings'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 
 /** Timer service methods used by ProcessManager + ManualAdopter. */
@@ -40,7 +44,6 @@ interface RemeSystemPrompt {}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    settings: SettingsProvider
     subprocess: SubprocessRuntime
     timer: RemeTimer
     commands: RemeCommands
