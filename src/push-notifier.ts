@@ -11,7 +11,10 @@
  * `SessionEventMap` JSDoc, so the model never sees the rendered text.
  *
  * Dedup keeps the chat clean: the notifier tracks the last text it
- * pushed per cwd; a notify with the same rendered text is a no-op.
+ * pushed per cwd, and also the text currently in flight for that cwd
+ * — a notify whose rendered text matches either one is a no-op, so
+ * the two push sources that fire on a single `ready` emit collapse
+ * into one card.
  *
  * @module reme-auto-router/push-notifier
  */
@@ -62,6 +65,17 @@ export class PushNotifier {
   private readonly resolveAgent: AgentResolver
   private readonly logger: PushNotifierLogger
   private readonly lastPushed = new Map<string, string>()
+  /**
+   * Text currently being delivered per cwd.
+   *
+   * `lastPushed` is only written after `commands.execute` resolves, so
+   * two pushes triggered by the same state transition (the ready
+   * promote path and the manager state-change fallback both fire on
+   * one `ready` emit) would both pass the memo check while neither has
+   * recorded its text yet — producing two identical cards. This guard
+   * closes that window.
+   */
+  private readonly inFlight = new Map<string, string>()
 
   constructor(deps: PushNotifierDeps) {
     this.ctx = deps.ctx
@@ -87,30 +101,39 @@ export class PushNotifier {
     }
     const text = renderStatusLine(snapshot)
     if (this.lastPushed.get(snapshot.cwd) === text) return
-    const agent = this.resolveAgent(sessionId)
-    if (agent === undefined) {
-      this.logger.warn(`push-notifier: no agent for session '${String(sessionId)}'; skipping push`)
-      return
-    }
-    const commands = this.ctx.get('commands') as
-      | { execute(a: Agent, line: string, images: readonly never[], signal: AbortSignal): Promise<unknown> }
-      | undefined
-    if (commands === undefined) {
-      this.logger.warn('push-notifier: ctx.commands is unavailable; skipping push')
-      return
-    }
+    if (this.inFlight.get(snapshot.cwd) === text) return
+    this.inFlight.set(snapshot.cwd, text)
     try {
-      await commands.execute(agent, '/reme', [], new AbortController().signal)
-      this.lastPushed.set(snapshot.cwd, text)
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-      this.logger.warn(`push-notifier: commands.execute for '${snapshot.cwd}' rejected: ${reason}`)
+      const agent = this.resolveAgent(sessionId)
+      if (agent === undefined) {
+        this.logger.warn(`push-notifier: no agent for session '${String(sessionId)}'; skipping push`)
+        return
+      }
+      const commands = this.ctx.get('commands') as
+        | { execute(a: Agent, line: string, images: readonly never[], signal: AbortSignal): Promise<unknown> }
+        | undefined
+      if (commands === undefined) {
+        this.logger.warn('push-notifier: ctx.commands is unavailable; skipping push')
+        return
+      }
+      try {
+        await commands.execute(agent, '/reme', [], new AbortController().signal)
+        this.lastPushed.set(snapshot.cwd, text)
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
+        this.logger.warn(`push-notifier: commands.execute for '${snapshot.cwd}' rejected: ${reason}`)
+      }
+    } finally {
+      // Release the guard on every path, including the early returns
+      // above, so a failed or skipped push stays retryable.
+      if (this.inFlight.get(snapshot.cwd) === text) this.inFlight.delete(snapshot.cwd)
     }
   }
 
   /** Reset dedup memory. Useful on plugin teardown. */
   dispose(): void {
     this.lastPushed.clear()
+    this.inFlight.clear()
   }
 }
 

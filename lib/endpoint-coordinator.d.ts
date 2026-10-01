@@ -63,6 +63,22 @@ export declare class EndpointCoordinator {
     private readonly formatEndpoint;
     /** Per-cause one-shot warn flag so the log never spams. */
     private warnedNoSink;
+    /**
+     * Last endpoint actually delivered, as `(sink identity, cwd, url)`.
+     *
+     * A single `ready` transition reaches us through three independent
+     * triggers (the detector's promote path re-firing
+     * `onActiveCwdChanged`, our own manager subscription, and the
+     * `index.ts` manager subscription), so the same target would be
+     * written — and logged — three times. Routing is idempotent on the
+     * peer side (dsh-reme-support's `setEndpoint` re-runs
+     * `runtime.reconfigure()`, whose effects drain on the first call),
+     * so re-asserting an identical target is pure noise. Comparing the
+     * sink identity too means a re-mounted `remeMemory` service is never
+     * skipped by a stale memo.
+     */
+    private lastSink;
+    private lastRouted;
     /** Disposer for the manager state-change subscription. */
     private stateChangeDispose;
     /** Currently scheduled route call; subsequent ones chain onto the tail. */

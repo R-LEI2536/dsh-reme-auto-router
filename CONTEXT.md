@@ -62,8 +62,11 @@ source under `src/` for how each concept is realised.
   the card text.
 - **/reme command** — The slash command the user types (or the plugin
   simulates on state change) to render the current instance's status.
-- **dedup** — Per-cwd memo of the last rendered text; a push whose text
-  matches the last push for that cwd is a no-op.
+- **dedup** — Per-cwd memo of the last rendered text, plus the text
+  currently in flight; a push matching either is a no-op. The memo is
+  written only after `commands.execute` resolves, so the in-flight
+  guard is what collapses the two push sources that fire on a single
+  `ready` emit.
 
 ## Tooling
 

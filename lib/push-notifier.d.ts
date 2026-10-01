@@ -11,7 +11,10 @@
  * `SessionEventMap` JSDoc, so the model never sees the rendered text.
  *
  * Dedup keeps the chat clean: the notifier tracks the last text it
- * pushed per cwd; a notify with the same rendered text is a no-op.
+ * pushed per cwd, and also the text currently in flight for that cwd
+ * — a notify whose rendered text matches either one is a no-op, so
+ * the two push sources that fire on a single `ready` emit collapse
+ * into one card.
  *
  * @module reme-auto-router/push-notifier
  */
@@ -56,6 +59,17 @@ export declare class PushNotifier {
     private readonly resolveAgent;
     private readonly logger;
     private readonly lastPushed;
+    /**
+     * Text currently being delivered per cwd.
+     *
+     * `lastPushed` is only written after `commands.execute` resolves, so
+     * two pushes triggered by the same state transition (the ready
+     * promote path and the manager state-change fallback both fire on
+     * one `ready` emit) would both pass the memo check while neither has
+     * recorded its text yet — producing two identical cards. This guard
+     * closes that window.
+     */
+    private readonly inFlight;
     constructor(deps: PushNotifierDeps);
     /**
      * Push the current state for `instance` to the chat flow of

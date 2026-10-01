@@ -4,6 +4,29 @@ All notable changes to `dsh-reme-auto-router` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions adhere to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Duplicate `routed` log lines**: a single `ready` transition reaches
+  `EndpointCoordinator` through three independent triggers (the detector's
+  promote path re-firing `onActiveCwdChanged`, the coordinator's own manager
+  subscription, and the `index.ts` manager subscription), so the same target
+  was written and logged three times. The coordinator now memoises the last
+  successfully delivered `(sink, cwd, endpoint)` and short-circuits repeats,
+  so one transition logs `routed <cwd> → http://127.0.0.1:<port>` once. A port
+  change (instance respawn) or a re-mounted `remeMemory` service still routes.
+- **Duplicate `🔄 reme ready` cards**: `PushNotifier`'s memo is written only
+  after `await commands.execute(...)`, so the two pushes fired by one `ready`
+  emit (`onActiveCwdChanged` and the manager state-change fallback) both passed
+  the check before either recorded its text, appending two identical
+  `command/done` cards. A per-cwd in-flight guard now collapses them; distinct
+  texts still both deliver, and a failed delivery stays retryable.
+- **Tests**: `tests/endpoint-coordinator.mts` gained a case covering repeated
+  triggers, port change, and sink re-mount; new `tests/push-notifier.mts`
+  locks the notifier's dedup seam. Wired into `pnpm run verify` as
+  `test:notifier`.
+
 ## [0.3.1] — route seam verified against dsh-reme-support 0.2.2
 
 ### Changed

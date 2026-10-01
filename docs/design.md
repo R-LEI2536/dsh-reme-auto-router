@@ -266,6 +266,17 @@ pinnedDirs: []                # string[], cwd realpath
 - idle timer touch（设计 §5.2）只重置 lastUsedAt、不触发 push
 - 切 A→B→A 各推两次（A→B 时推 B 的 ready，B→A 时推 A 的 ready），不重复推同一 cwd 的同一文本
 
+`lastText` 只在 `commands.execute` 成功返回后才落账，而一次 `ready` 转换有**两条**推送链路会触发
+（`detector.onActiveCwdChanged` 与 `index.ts` 的 `manager.onStateChange`），它们在同一轮同步 emit 里
+先后进入 `push()`，彼此都还没落账 → 会各推一张。因此再加一道 **per-cwd in-flight 守卫**：正在投递中的
+同文本直接短路。守卫按渲染文本（而非 cwd）比对，所以 `starting…` → `ready` 这类不同文本仍各推一张；
+投递失败时释放守卫且不落账，下次事件照常重试。
+
+`EndpointCoordinator` 同理记住上次写成功的 `(sink 身份, cwd, endpoint)`：一次 `ready` 转换有**三条**触发
+链路（detector promote → `onActiveCwdChanged`、coordinator 自身订阅、`index.ts` 订阅），只有首次真正调用
+`setEndpoint` 并打一条 `routed` 日志。对方 `setEndpoint` 幂等（`reme-memory-setEndpoint-contract.md` §3.4），
+同目标重复调用纯属噪声；端口变化（实例重生）或 `remeMemory` 服务重挂载时 memo 自然失效、照常重写。
+
 ### 砍掉的候选（奥卡姆剃刀）
 
 - ~~`pinned` 状态显示~~ → 配置项，不属于运行时状态

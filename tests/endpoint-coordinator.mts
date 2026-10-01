@@ -14,6 +14,8 @@
  *   3. service missing                   → warn exactly once, further routes silent
  *   4. service present but no setEndpoint→ warn exactly once, no throw
  *   5. setEndpoint throws                → warn once, rejection not propagated
+ *   6. repeated triggers for one target  → exactly one write and one log;
+ *                                          a port or sink change still routes
  *
  * Run via:
  *   pnpm exec tsx --tsconfig tsconfig.base.json \
@@ -33,6 +35,10 @@ class ContextStub {
   }
   get<T = unknown>(name: string): T | undefined {
     return this.services.get(name) as T | undefined
+  }
+  /** Test-only: swap a service, e.g. to simulate a re-mounted remeMemory. */
+  set(name: string, value: unknown): void {
+    this.services.set(name, value)
   }
 }
 
@@ -197,6 +203,48 @@ async function main(): Promise<void> {
     assert(logger.warns.length === 1, `expected exactly 1 warn, got ${logger.warns.length}`)
     assert(logger.warns[0]?.includes("setEndpoint('http://127.0.0.1:2340') failed") ?? false, `unexpected warn text: ${logger.warns[0] ?? '(none)'}`)
     console.log('ok   setEndpoint throw: warn once, route resolves')
+  }
+
+  // 6. One `ready` transition reaches the coordinator through three
+  //    independent triggers in the host wiring (detector promote →
+  //    onActiveCwdChanged, the coordinator's own manager subscription,
+  //    and the index.ts manager subscription), so `route()` runs three
+  //    times for the same target. Only the first may write and log;
+  //    a genuinely different port — or a re-mounted sink — must still
+  //    route, otherwise a respawned instance would keep the endpoint
+  //    pointed at its dead predecessor's port.
+  {
+    const sinkA = new RecordingSink()
+    const ctx = new ContextStub({ remeMemory: sinkA })
+    const manager = new ManagerStub()
+    manager.put(instance(CWD, PORT, 'ready'))
+    const logger = new LoggerStub()
+    const coordinator = new EndpointCoordinator({
+      ctx: ctx as never,
+      manager: manager as never,
+      activeCwd: () => CWD,
+      logger,
+    })
+    await coordinator.route(CWD)
+    await coordinator.route(CWD)
+    await coordinator.route(CWD)
+    assert(sinkA.urls.length === 1, `duplicate triggers must write once, got ${sinkA.urls.length}`)
+    assert(logger.infos.length === 1, `duplicate triggers must log once, got ${logger.infos.length}`)
+
+    // Same cwd, different port: the respawn case — must re-route.
+    manager.put(instance(CWD, PORT + 1, 'ready'))
+    await coordinator.route(CWD)
+    assert(sinkA.urls.length === 2, `port change must re-route, got ${sinkA.urls.length}`)
+    assert(sinkA.urls[1] === `http://127.0.0.1:${PORT + 1}`, `unexpected endpoint ${sinkA.urls[1]}`)
+
+    // Same cwd, same port, new service object: must re-route rather
+    // than trust a memo keyed only on the URL.
+    const sinkB = new RecordingSink()
+    ctx.set('remeMemory', sinkB)
+    await coordinator.route(CWD)
+    assert(sinkB.urls.length === 1, `re-mounted sink must be routed, got ${sinkB.urls.length}`)
+    assert(sinkA.urls.length === 2, 'the replaced sink must not be written again')
+    console.log('ok   duplicate triggers collapse to one write; port and sink changes still route')
   }
 
   console.log('\nendpoint-coordinator: all checks passed')

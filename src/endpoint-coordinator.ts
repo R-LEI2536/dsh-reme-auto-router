@@ -71,6 +71,23 @@ export class EndpointCoordinator {
   /** Per-cause one-shot warn flag so the log never spams. */
   private warnedNoSink = false
 
+  /**
+   * Last endpoint actually delivered, as `(sink identity, cwd, url)`.
+   *
+   * A single `ready` transition reaches us through three independent
+   * triggers (the detector's promote path re-firing
+   * `onActiveCwdChanged`, our own manager subscription, and the
+   * `index.ts` manager subscription), so the same target would be
+   * written — and logged — three times. Routing is idempotent on the
+   * peer side (dsh-reme-support's `setEndpoint` re-runs
+   * `runtime.reconfigure()`, whose effects drain on the first call),
+   * so re-asserting an identical target is pure noise. Comparing the
+   * sink identity too means a re-mounted `remeMemory` service is never
+   * skipped by a stale memo.
+   */
+  private lastSink: RemeMemoryEndpointSink | undefined
+  private lastRouted: { cwd: string; endpoint: string } | undefined
+
   /** Disposer for the manager state-change subscription. */
   private stateChangeDispose: (() => void) | undefined
   /** Currently scheduled route call; subsequent ones chain onto the tail. */
@@ -128,8 +145,18 @@ export class EndpointCoordinator {
       return
     }
     const endpoint = this.formatEndpoint(instance.port)
+    // Duplicate triggers for a target we already delivered are no-ops.
+    // Recorded only after a successful write, so a throwing
+    // setEndpoint stays retryable on the next trigger.
+    const alreadyRouted =
+      this.lastSink === remeMemory &&
+      this.lastRouted?.cwd === cwd &&
+      this.lastRouted.endpoint === endpoint
+    if (alreadyRouted) return
     try {
       remeMemory.setEndpoint(endpoint)
+      this.lastSink = remeMemory
+      this.lastRouted = { cwd, endpoint }
       this.logger.info?.(`reme-auto-router: routed ${cwd} → ${endpoint}`)
     } catch (error) {
       if (!this.warnedNoSink) {
