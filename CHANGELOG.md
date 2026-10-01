@@ -4,7 +4,7 @@ All notable changes to `dsh-reme-auto-router` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions adhere to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.2] — dedupe route writes and ready cards per state transition
 
 ### Fixed
 
