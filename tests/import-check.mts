@@ -64,7 +64,7 @@ if (!inject.includes('subprocess') || !inject.includes('sessions')) {
   failed++
 }
 if (inject.includes('settings')) {
-  console.error(`FAIL entry.inject still requires 'settings' (DSH 0.1.7 removed the namespace API): ${inject.join(',')}`)
+  console.error(`FAIL entry.inject still requires 'settings' (DSH 0.1.7+ removed the namespace API; 0.2.0-rc.1+ identical): ${inject.join(',')}`)
   failed++
 }
 

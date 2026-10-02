@@ -43,7 +43,7 @@
 | 5 | 用户手动实例：检测 + 认领不接管 | `ManualInstanceAdopter` 扫端口 + 读 cmdline |
 | 6 | 状态行：3 状态、英文、`reme:` 前缀 | `StatusSection.text()` lazy 求值 |
 | 7 | 健康检查：依赖 `reme_search` 自然失败 | 不做主动 probe |
-| 8 | 配置模型：插件 Config schema + `.volatile()` 字段（DSH 0.1.7）；设置页由 settings 服务自动生成 | `Config` 导出 + `settings-schema.ts` |
+| 8 | 配置模型：插件 Config schema + `.volatile()` 字段（DSH 0.1.7 引入，0.2.0-rc.1+ 沿用）；设置页由 settings 服务自动生成 | `Config` 导出 + `settings-schema.ts` |
 | 9 | Shutdown：SIGTERM → grace → SIGKILL | `waitForIdleBeforeShutdown` 默认 false，可选 true |
 | 10 | 不注册 Tool | `reme_search` 由官方提供 |
 
@@ -212,9 +212,9 @@ dsh-reme-auto-router/
 
 ---
 
-## 8. 配置模型（DSH 0.1.7：volatile Config）
+## 8. 配置模型（DSH 0.1.7 引入，0.2.0-rc.1+ 沿用：volatile Config）
 
-插件 `Config` schema（`src/settings-schema.ts`）的全部字段标 `.volatile()`；DSH 0.1.7 的
+插件 `Config` schema（`src/settings-schema.ts`）的全部字段标 `.volatile()`；DSH 0.1.7 起（0.2.0-rc.1+ 同）的
 settings 服务据此在 WebUI 自动生成设置表单，编辑 live 生效并持久化到当前
 profile 的 `cordis.patch.yml`（entry `dsh-reme-auto-router` 的 `config` 层）。
 `apply` 从 `config` 参数的 volatile 引用（`.get()`）装配配置快照，无需重启。
@@ -322,7 +322,8 @@ pinnedDirs: []                # string[], cwd realpath
 
 ## 12. 已知限制
 
-- **WebUI 设置页**：DSH 0.1.7 起由 settings 服务按 volatile Config 自动生成（v0.3.0 落地）
+- **宿主要求**：0.4.0 起要求宿主 DSH `0.2.0-rc.1`+（消费的 `@deepseek-ai/dsh-*` peer 走 `^0.2.0-rc.1`）；0.3.x 及更早面向 0.1.7 宿主。0.1.x 宿主会被兼容门拦下，bundle 形态表现为整包跳过（`dsh: skipping profile bundle`）
+- **WebUI 设置页**：DSH 0.1.7 起（0.2.0-rc.1+ 同）由 settings 服务按 volatile Config 自动生成（v0.3.0 落地）
 - **不做主动健康检查**：reme 自身错误由 `reme_search` 工具报错接住
 - **多 tab 同时活跃不同 workspace**：取最近一次活跃为 active cwd
 - **不预先启动 pinned**：pin 的语义是"保活"，不是"预加载"

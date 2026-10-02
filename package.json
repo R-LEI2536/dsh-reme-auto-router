@@ -1,6 +1,6 @@
 {
   "name": "dsh-reme-auto-router",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "private": false,
   "description": "DeepSeek Harness plugin — auto-route reme_search to a workspace-bound reme instance.",
   "type": "module",

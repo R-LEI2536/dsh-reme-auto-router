@@ -4,6 +4,38 @@ All notable changes to `dsh-reme-auto-router` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions adhere to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — DSH 0.2.0-rc.1+ host requirement
+
+> **Host requirement**: this release targets DSH `0.2.0-rc.1` or later
+> (`@deepseek-ai/dsh* @ ^0.2.0-rc.1`). It does not run on 0.1.x hosts.
+
+### Changed
+
+- **Peer/dev ranges raised to the 0.2.0 track**: the five consumed
+  `@deepseek-ai/dsh-*` packages (`dsh-agent`, `dsh-commands`, `dsh-session`,
+  `dsh-subprocess`, `dsh-system-prompt`) moved from `^0.1.7-rc.1` to
+  `^0.2.0-rc.1`. The plugin compatibility gate rejects `^0.1.7-rc.1` on a
+  `0.2.0-rc.2` runtime (`^0.2.0` / `~0.2.0` would be rejected as well — they do
+  not admit prereleases), and a bundle-shaped plugin that fails the gate is
+  skipped as a whole (`dsh: skipping profile bundle "dsh-reme-auto-router"`).
+- **`pnpm-lock.yaml` re-resolved** to the `0.2.0-rc.2` family.
+- **No code change**: the 0.1.7-rc.2 → 0.2.0-rc.2 corridor removes nothing this
+  plugin consumes, so `src/**` is untouched and the tracked `lib/**` build
+  output is byte-identical. Verified with `pnpm run typecheck` (against the
+  0.2.0-rc.2 types), all seven test scripts, and a zero-diff `pnpm run build`.
+- **`@deepseek-ai/cordis`, `@deepseek-ai/cordis-plugin-timer` and
+  `@deepseek-ai/schemastery` are deliberately unchanged**: the gate only reads
+  `@deepseek-ai/dsh`-prefixed peer names, and all three are identical across
+  the corridor.
+- **Docs**: `README.md` now states the host requirement; `docs/design.md`
+  records the 0.2.0 generation as sharing the same volatile-`Config` model.
+
+### Not verified in this release
+
+- Cold-start acceptance on a real `0.2.0-rc.2` host (L3: no
+  `dsh: skipping profile bundle` on stderr) and the settings-page write path
+  (L5) are pending the host upgrade — this release passed L1 only.
+
 ## [0.3.2] — dedupe route writes and ready cards per state transition
 
 ### Fixed

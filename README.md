@@ -12,6 +12,8 @@ dsh plugin --profile web add github:R-LEI2536/dsh-reme-auto-router
 
 DSH 从 GitHub 拉取 release 仓库，载入 `lib/index.js`。
 
+> **宿主要求**：0.4.0 起要求宿主 DSH `0.2.0-rc.1` 或更高（消费的 `@deepseek-ai/dsh-*` peer 走 `^0.2.0-rc.1`）。0.3.x 及更早的插件版本面向 DSH 0.1.7 宿主；0.1.x 宿主会被插件的兼容门拦下（bundle 形态是整包跳过，不是禁用某一行）。
+
 **不要** 在用户目录或插件目录下手动执行 `npm install` / `pnpm install`：
 
 - `lib/` 已入仓，运行时不需要 node_modules
@@ -46,9 +48,9 @@ dsh plugin --profile web add "link:/absolute/path/to/dsh-reme-auto-router"
 - **用户手动起的 reme**：探测端口 + 读 cmdline 区分所有权，标记为 adopted（只读不接管生命周期）。
 - **用户感知**：plugin 内部模拟 user 敲一次 `/reme` slash command，把 reme 状态以「命令结果卡片」形式推到 WebUI 聊天流——`command/done` 是 log-only event，**model 永远看不到**卡片文字，user 看到。同一 cwd 同一状态的卡片自动去重，状态变化时才冒新卡。
 
-## 配置（插件 Config，DSH 0.1.7 模型）
+## 配置（插件 Config，DSH 0.1.7+ / 0.2.0-rc.1+ 模型）
 
-所有可编辑字段在插件 `Config` schema 上声明 `.volatile()`。DSH 0.1.7 起设置页由 settings 服务**根据 volatile 字段自动生成**，编辑后 live 生效并持久化到当前 profile 的 `cordis.patch.yml`（entry id `dsh-reme-auto-router` 的 `config` 层）——无需手编 yaml、无需重启。
+所有可编辑字段在插件 `Config` schema 上声明 `.volatile()`。DSH 0.1.7 起（0.2.0 世代沿用同一模型）设置页由 settings 服务**根据 volatile 字段自动生成**，编辑后 live 生效并持久化到当前 profile 的 `cordis.patch.yml`（entry id `dsh-reme-auto-router` 的 `config` 层）——无需手编 yaml、无需重启。
 
 字段（默认值）：
 
