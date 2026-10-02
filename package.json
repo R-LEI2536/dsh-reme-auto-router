@@ -1,11 +1,21 @@
 {
   "name": "dsh-reme-auto-router",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": false,
   "description": "DeepSeek Harness plugin — auto-route reme_search to a workspace-bound reme instance.",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "lib",
     "cordis.patch.yml",
@@ -15,10 +25,19 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/build-client.mjs",
+    "build:client": "node scripts/build-client.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:import": "tsx tests/import-check.mts",
     "test:detector": "tsx tests/detector-state.mts",
@@ -27,28 +46,57 @@
     "test:coordinator": "tsx tests/endpoint-coordinator.mts",
     "test:notifier": "tsx tests/push-notifier.mts",
     "test:llm-source": "tsx tests/llm-source.mts",
-    "verify": "pnpm run typecheck && pnpm run test:import && pnpm run test:detector && pnpm run test:race && pnpm run test:apply && pnpm run test:coordinator && pnpm run test:notifier && pnpm run test:llm-source"
+    "test:client-card": "tsx tests/client-card.mts",
+    "verify": "pnpm run typecheck && pnpm run test:import && pnpm run test:detector && pnpm run test:race && pnpm run test:apply && pnpm run test:coordinator && pnpm run test:notifier && pnpm run test:llm-source && pnpm run test:client-card"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.4",
     "@deepseek-ai/cordis-plugin-timer": "^1.1.6",
     "@deepseek-ai/dsh-agent": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-locale": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-store": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.2.0-rc.1",
     "@deepseek-ai/dsh-commands": "^0.2.0-rc.1",
     "@deepseek-ai/dsh-session": "^0.2.0-rc.1",
     "@deepseek-ai/dsh-subprocess": "^0.2.0-rc.1",
     "@deepseek-ai/dsh-system-prompt": "^0.2.0-rc.1",
-    "@deepseek-ai/schemastery": ">=3.18.4"
+    "@deepseek-ai/schemastery": ">=3.18.4",
+    "react": "^18.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-client-locale": { "optional": true },
+    "@deepseek-ai/dsh-client-store": { "optional": true },
+    "@deepseek-ai/dsh-client-ui-plugin-manager": { "optional": true },
+    "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
+    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
+    "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
+    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+    "react": { "optional": true }
   },
   "devDependencies": {
     "@deepseek-ai/cordis": ">=4.0.4",
     "@deepseek-ai/cordis-plugin-timer": "^1.1.6",
     "@deepseek-ai/dsh-agent": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-store": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
     "@deepseek-ai/dsh-commands": "^0.2.0-rc.1",
     "@deepseek-ai/dsh-session": "^0.2.0-rc.1",
     "@deepseek-ai/dsh-subprocess": "^0.2.0-rc.1",
     "@deepseek-ai/dsh-system-prompt": "^0.2.0-rc.1",
     "@deepseek-ai/schemastery": ">=3.18.4",
     "@types/node": "^22.15.0",
+    "@types/react": "~18.3.31",
+    "esbuild": "^0.28.2",
+    "react": "^18.3.1",
     "tsx": "^4.20.0",
     "typescript": "^5.9.2"
   }

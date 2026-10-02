@@ -4,10 +4,31 @@ All notable changes to `dsh-reme-auto-router` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions adhere to [Semantic Versioning](https://semver.org/).
 
-## [0.4.1] — LLM key sourced from DSH credentials at spawn
+## [0.4.1] — LLM key sourced from DSH credentials + Plugins-page settings card
 
 ### Added
 
+- **Browser half + Plugins-page settings card**: the volatile schema alone never
+  rendered anywhere in the Web UI — every settings surface (the Settings
+  sidebar's `settings.section`, and the Plugins page's `plugins.item` cards the
+  official settings pages use) is a **client** slot registration, so a
+  server-only plugin had no entry point at all. This release ships
+  `src/client/*`, a `package.json#dsh.client` declaration, and a built
+  `lib/client.js` that registers one `plugins.item` card ("ReMe Auto Router" in
+  the Plugins page's Official group) rendered through the official
+  `SettingsForm` / `SettingsValueField` + `SettingsFormModel`. Edits save to the
+  profile's user layer and take effect live.
+  - `LlmScope` adapts the nested `llm` section to the flat, top-level field
+    model the official form machinery addresses (`path: [field]`,
+    `Object.hasOwn(user, field)`), nesting each staged path operation back under
+    `llm`. The Host accepts those paths (`isVolatilePath`), so the Config schema
+    keeps its shape.
+  - The card is registered unconditionally: a namespace the Host does not serve
+    still shows the card with the form's own `unavailable` line, which makes a
+    profile entry that never composed visible instead of leaving the page with
+    no trace of the plugin.
+  - No `settings.section` is added: the settings are few, and the Plugins page
+    is where the official settings pages already live.
 - **`llm` configuration section (mirrors dsh-user-approval's settings
   shape)**: `provider` / `model` are `string | null` — `null` inherits
   the host default-model selection (`agentDefaultModel.currentSelection()`),
@@ -33,7 +54,16 @@ versions adhere to [Semantic Versioning](https://semver.org/).
 - **Docs**: README documents the `llm` section, the inheritance semantics
   and the residual `.env`-override rule (reme's `load_env(override=True)`
   still wins when a `.env` with `LLM_*` exists within 5 parents of the
-  workspace cwd).
+  workspace cwd). It also corrects the earlier claim that the settings page is
+  generated with no client plugin, and documents the Plugins-page card as the
+  configuration entry point.
+- **Build**: `pnpm run build` now emits the browser bundle too
+  (`lib/client.js` via `scripts/build-client.mjs`); `exports["./client"]` and
+  the optional client peer dependencies are declared. The Node build excludes
+  `src/client` (the browser half is bundled by esbuild only).
+- **Tests**: new `tests/client-card.mts` (nested projection, `llm.*` path
+  nesting + write fence, seat contract, built-artifact handoff and
+  platform-only requires) wired into `pnpm run verify`.
 - **Tests**: new `tests/llm-source.mts` (credentials seam absent,
   probe-chain fallback, explicit `apiKeyRef`, empty-value skip, model
   inheritance, baseUrl defaults, key-gate) wired into `pnpm run verify`.

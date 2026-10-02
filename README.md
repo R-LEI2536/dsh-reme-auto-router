@@ -10,7 +10,7 @@
 dsh plugin --profile web add github:R-LEI2536/dsh-reme-auto-router
 ```
 
-DSH 从 GitHub 拉取 release 仓库，载入 `lib/index.js`。
+DSH 从 GitHub 拉取 release 仓库，载入 `lib/index.js`（服务端）与 `lib/client.js`（Web UI 插件页卡片）。
 
 > **宿主要求**：0.4.0 起要求宿主 DSH `0.2.0-rc.1` 或更高（消费的 `@deepseek-ai/dsh-*` peer 走 `^0.2.0-rc.1`）。0.3.x 及更早的插件版本面向 DSH 0.1.7 宿主；0.1.x 宿主会被插件的兼容门拦下（bundle 形态是整包跳过，不是禁用某一行）。
 
@@ -50,7 +50,19 @@ dsh plugin --profile web add "link:/absolute/path/to/dsh-reme-auto-router"
 
 ## 配置（插件 Config，DSH 0.1.7+ / 0.2.0-rc.1+ 模型）
 
-所有可编辑字段在插件 `Config` schema 上声明 `.volatile()`。DSH 0.1.7 起（0.2.0 世代沿用同一模型）设置页由 settings 服务**根据 volatile 字段自动生成**，编辑后 live 生效并持久化到当前 profile 的 `cordis.patch.yml`（entry id `dsh-reme-auto-router` 的 `config` 层）——无需手编 yaml、无需重启。
+所有可编辑字段在插件 `Config` schema 上声明 `.volatile()`，编辑后 live 生效并持久化到当前 profile 的 `cordis.patch.yml`（entry id `dsh-reme-auto-router` 的 `config` 层）——无需手编 yaml、无需重启。
+
+**但 volatile 只是服务端契约**：Web UI 里的渲染位全是客户端 slot，所以插件必须自带浏览器半区（v0.4.1 起：`lib/client.js` + `package.json#dsh.client`）。本插件的入口是**插件管理页**里的一张卡片，而不是设置页侧边栏——配置项少，不单开 `settings.section`，避免污染设置页。
+
+### 在 Web UI 里改配置（插件管理页卡片）
+
+1. Web UI → **插件**
+2. **Official** 组里点 **ReMe Auto Router** 卡片
+3. 改 Provider / Model / API key 引用 / Base URL → **保存**
+
+保存写入当前 profile `cordis.patch.yml` 的用户层（`dsh-reme-auto-router` 的 `config.llm`），live 生效、无需重启；留空 = 继承/不注入（见下节语义）。
+
+> 卡片若显示「宿主当前没有提供本插件的设置命名空间」，说明该 profile 没有组合本插件的 entry（未启用 / bundle 未加载）：`dsh plugin --profile web add …` 后重启 DSH，入口就会出现。
 
 字段（默认值）：
 
@@ -89,7 +101,7 @@ llm:                                  # spawn reme 时从 DSH 注入的 LLM 配�
 pnpm run verify
 ```
 
-跑全部 6 个测试（`import-check` / `detector-state` / `state-store-race` / `smoke-apply` / `endpoint-coordinator` / `llm-source`）+ `tsc --noEmit`。
+跑全部 8 个测试（`import-check` / `detector-state` / `state-store-race` / `smoke-apply` / `endpoint-coordinator` / `push-notifier` / `llm-source` / `client-card`）+ `tsc --noEmit`。`client-card` 里的 `lib/client.js` 产物断言需要先 `pnpm run build`（未构建时自动跳过）。
 
 ## 已知限制
 
@@ -99,6 +111,7 @@ pnpm run verify
 - 自动推送的去重粒度是「同一 cwd 同一渲染文本」；快速切换 workspace 时每个目标 cwd 各推一次（不会重复推同一 cwd）
 - Windows 不支持（manual-adopter 用 `lsof` + `/proc/<pid>/cmdline`，macOS/Linux only）
 - 没有 user-launched WebUI chip——chat 卡片是唯一的 user 感知通道
+- 配置入口依赖插件 entry 被当前 profile 组合：浏览器半区只在宿主 serve 该 settings 命名空间时才渲染卡片内容（卡片本身始终在，未 serve 时显示 unavailable 行）
 - 路由协调依赖官方 reme-memory 插件暴露 `remeMemory.setEndpoint`——dsh-reme-support ≥ 0.2.2 已提供；未挂载或旧版本时跳过路由写入并 warn 一次（`remeMemory service is unavailable`）
 - **stale endpoint（定性，P2）**：实例 idle stop / 异常退出 / DSH 重启未 respawn 期间，最后一次 endpoint 保留指向已停端口，直到下次实例 `ready` 重新路由或 DSH 重启。窗口内 `reme_search` 报错（用户可见）、`auto_memory`/`auto_dream` `fetch failed`（数据不丢，下批重投成功）。与 0.1.5 时代行为一致，本期不改；撤销需契约扩展（`setEndpoint(undefined)` 或独立 clear），记录为后续项
 

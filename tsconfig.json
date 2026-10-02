@@ -16,6 +16,7 @@
     "target": "es2024",
     "module": "esnext",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "declaration": true,
     "declarationMap": true,
     "incremental": true,
@@ -32,6 +33,6 @@
     "composite": false,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.mts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.mts", "tests/**/*.ts"],
   "exclude": ["node_modules", "lib"]
 }

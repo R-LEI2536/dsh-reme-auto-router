@@ -375,6 +375,15 @@ pinnedDirs: []                # string[], cwd realpath
 **v0.1.0 已知问题**（详见 §16）：
 - 切 workspace 期间 endpoint 数据错位（§16.1，P0 优先）
 
+**v0.4.1 新增（浏览器半区）**：
+- src/client/card-seat.ts — 插件页席位描述符（id / order / 词典 / inject face），纯类型依赖，可在 Node 直测
+- src/client/llm-form-scope.ts — `LlmScope`：`llm` 嵌套小节的扁平投影 + 写路径嵌回 `llm.*`
+- src/client/reme-card-controller.ts — `SettingsFormModel` 暂存表单（4 个 LLM 字段）
+- src/client/RemeCard.tsx — 卡片视图（summary 一行 / page 表单），官方 `SettingsForm` + `SettingsValueField`
+- src/client/index.ts — apply：注册词典 + 无条件注册 `plugins.item` 席位
+- scripts/build-client.mjs — esbuild 产出 `lib/client.js`（module-loader handoff，external 仅平台模块）
+- tests/client-card.mts — LlmScope 投影/嵌套、席位契约、产物 handoff 断言
+
 **已废弃**（不再使用，源文件已删除）：
 - status-section.ts — systemPrompt 注册路径已删除；用户感知改走 slash-command + push-notifier 的卡片通道
 
@@ -434,12 +443,33 @@ pinnedDirs: []                # string[], cwd realpath
 
 **取舍**：切 workspace 期间 UX 短暂延迟（"切换中..."），但**数据正确性**——窗口期内 reme 调用仍走老 reme，**老 reme 是 ready 的、数据正确**。比 v0.1.0 的"数据错位"是质的改进。
 
-### 16.2 [已由 DSH 0.1.7 免费关闭] WebUI 设置页
+### 16.2 [已关闭，v0.4.1 补齐另一半] WebUI 配置入口
 
-v1 只支持 `~/.dsh/settings.yaml` 手编。DSH 0.1.7 起 settings 服务根据插件
-`Config` schema 的 `.volatile()` 字段**自动生成设置页**（无需 client 插件），
-编辑 live 生效并写入 profile 的 `cordis.patch.yml`。本插件已随 v0.3.0 迁移到该模型。
-（旧的 `settings.section` / `settings.plugin.item` client 席位方案不再需要。）
+v1 只支持 `~/.dsh/settings.yaml` 手编。DSH 0.1.7 起 settings 服务按插件 `Config`
+schema 的 `.volatile()` 字段产出可编辑描述符，编辑 live 生效并写入 profile 的
+`cordis.patch.yml`；本插件已随 v0.3.0 迁移到该模型。
+
+**但当时的结论「无需 client 插件」是错的**（v0.4.1 核实 DSH 0.2.0-rc.2）：volatile
+schema 只是**服务端契约**，Web UI 里所有渲染位都是**客户端 slot 注册**出来的——
+
+- 设置侧边栏分区：`settings.section`（如 dsh-user-approval）；
+- 插件页 Official 组卡片：`plugins.item`（官方设置页 shell / agent-loop / subagent / web-search 全走这条）；
+- bundle / row 级配置：`plugins.bundle.config` / `plugins.row.config`。
+
+插件页 Official 组的卡片列表来自 `ctx.slots.entries('plugins.item')`（客户端 ledger），
+点开卡片才经 `PluginManagerPage` 的 `ItemDetail` 挂载表单。纯服务端插件两边都没有，
+所以在 Web UI 里**完全没有入口**——这正是「设置页/插件页都找不到」的根因。
+
+v0.4.1 补齐浏览器半区：`src/client/*` + `package.json#dsh.client` + `lib/client.js`
+（module-loader 契约 `window.__ModuleLoader__.load({ id, factory })`），注册一张
+`plugins.item` 卡片，用官方 `SettingsForm` / `SettingsValueField` + `SettingsFormModel`
+渲染表单。因为官方表单模型只寻址**顶层**字段（`path: [field]`、`Object.hasOwn(user, field)`），
+而本插件的 LLM 配置在 `llm` 子对象里，故加一层 `LlmScope` 适配器把顶层字段 op 嵌回
+`llm.*`——服务端 `isVolatilePath` 允许 volatile 子树下的任意路径，schema 无需改形状。
+
+**刻意不做 `settings.section`**：配置项少，不单开设置页分区（避免污染设置页）；
+入口就是插件页卡片。卡片**无条件注册**：命名空间未 serve 时表单显示 unavailable 行，
+把「profile 没组合 entry」这个失败模式暴露出来，而不是整页消失。
 
 ### 16.3 [P2] publish 链路 + GitHub Actions
 

@@ -16,5 +16,5 @@
     "incremental": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "tests", "lib"]
+  "exclude": ["node_modules", "tests", "lib", "src/client"]
 }

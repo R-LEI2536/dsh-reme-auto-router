@@ -67,6 +67,14 @@ source under `src/` for how each concept is realised.
   written only after `commands.execute` resolves, so the in-flight
   guard is what collapses the two push sources that fire on a single
   `ready` emit.
+- **plugins-page card** — The configuration entry point: a `plugins.item`
+  seat registered by the browser half (`src/client/`), listed in the
+  Plugins page's Official group. Renders the Host-served `llm` section
+  through the official `SettingsForm` / `SettingsValueField`, with
+  `LlmScope` nesting the card's flat field paths back under `llm`. No
+  `settings.section` exists by design (few settings; avoid polluting the
+  Settings page). Registered unconditionally so an unserved namespace
+  shows the form's `unavailable` line instead of no card at all.
 
 ## Tooling
 
