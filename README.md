@@ -52,17 +52,18 @@ dsh plugin --profile web add "link:/absolute/path/to/dsh-reme-auto-router"
 
 所有可编辑字段在插件 `Config` schema 上声明 `.volatile()`，编辑后 live 生效并持久化到当前 profile 的 `cordis.patch.yml`（entry id `dsh-reme-auto-router` 的 `config` 层）——无需手编 yaml、无需重启。
 
-**但 volatile 只是服务端契约**：Web UI 里的渲染位全是客户端 slot，所以插件必须自带浏览器半区（v0.4.1 起：`lib/client.js` + `package.json#dsh.client`）。本插件的入口是**插件管理页**里的一张卡片，而不是设置页侧边栏——配置项少，不单开 `settings.section`，避免污染设置页。
+**但 volatile 只是服务端契约**：Web UI 里的渲染位全是客户端 slot，所以插件必须自带浏览器半区（v0.4.1 起：`lib/client.js` + `package.json#dsh.client`）。本插件的入口是**插件包页里那一行组件**（bundle 自己的 `plugins.row.config` 席位），而不是设置页侧边栏——配置项少，不单开 `settings.section`，避免污染设置页；也不占用官方 host-plane 设置页专用的 `plugins.item` 席位。
 
-### 在 Web UI 里改配置（插件管理页卡片）
+### 在 Web UI 里改配置（插件包页 → 组件行）
 
 1. Web UI → **插件**
-2. **Official** 组里点 **ReMe Auto Router** 卡片
-3. 只填两个字段：**Provider** / **Model**（通常两个都留空即可）→ **保存**
+2. 插件列表里点 **dsh-reme-auto-router**
+3. 「包含的组件」里点**那一行**（注册 row 配置后会带箭头、可点）→ 打开设置页
+4. 只填两个字段：**Provider** / **Model**（通常两个都留空即可）→ **保存**
 
 保存写入当前 profile `cordis.patch.yml` 的用户层（`dsh-reme-auto-router` 的 `config.llm`），live 生效、无需重启；留空 = 继承宿主默认。**API key 与端点不用填**：它们在 spawn 时从所选 provider 的 DSH 配置里自动读（见下节）。
 
-> 卡片若显示「宿主当前没有提供本插件的设置命名空间」，说明该 profile 没有组合本插件的 entry（未启用 / bundle 未加载）：`dsh plugin --profile web add …` 后重启 DSH，入口就会出现。
+> 那一行若是不可点的纯文本，说明浏览器半区没加载（roster 扫描在 DSH 启动时跑：改完要重启 DSH 再硬刷新）；若点进去表单显示「宿主当前没有提供本插件的设置命名空间」，说明该 profile 没有组合本插件的 entry（未启用 / bundle 未加载）：`dsh plugin --profile web add …` 后重启 DSH，入口就会出现。
 
 字段（默认值）：
 

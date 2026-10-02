@@ -8,32 +8,43 @@ versions adhere to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Browser half + Plugins-page settings card**: the volatile schema alone never
+- **Browser half + Plugins-page settings page**: the volatile schema alone never
   rendered anywhere in the Web UI — every settings surface (the Settings
-  sidebar's `settings.section`, and the Plugins page's `plugins.item` cards the
-  official settings pages use) is a **client** slot registration, so a
-  server-only plugin had no entry point at all. This release ships
-  `src/client/*`, a `package.json#dsh.client` declaration, and a built
-  `lib/client.js` that registers one `plugins.item` card ("ReMe Auto Router" in
-  the Plugins page's Official group) rendered through the official
-  `SettingsForm` / `SettingsValueField` + `SettingsFormModel`. Edits save to the
-  profile's user layer and take effect live.
+  sidebar's `settings.section`, the Plugins page's `plugins.item` cards the
+  official host-plane settings pages use, and the bundle/row seats) is a
+  **client** slot registration, so a server-only plugin had no entry point at
+  all. This release ships `src/client/*`, a `package.json#dsh.client`
+  declaration, and a built `lib/client.js` that claims the bundle's own
+  **`plugins.row.config`** seat (`<package name>#<row id>`) — opening the plugin
+  on the Plugins page and then its component opens the form — rendered through
+  the official `SettingsForm` / `SettingsValueField` + `SettingsFormModel`.
+  Edits save to the profile's user layer and take effect live.
   - `LlmScope` adapts the nested `llm` section to the flat, top-level field
     model the official form machinery addresses (`path: [field]`,
     `Object.hasOwn(user, field)`), nesting each staged path operation back under
     `llm`. The Host accepts those paths (`isVolatilePath`), so the Config schema
     keeps its shape.
-  - The card edits **two fields only** — Provider and Model, the same knobs
+  - The form edits **two fields only** — Provider and Model, the same knobs
     dsh-user-approval exposes as `smartProvider` / `smartModel` (blank inherits
     the host default-model selection). The credential reference and the endpoint
     are **derived from the provider's own DSH profile** at spawn time, so the
     user never types them.
-  - The card is registered unconditionally: a namespace the Host does not serve
-    still shows the card with the form's own `unavailable` line, which makes a
+  - The seat is registered unconditionally: a namespace the Host does not serve
+    still renders the form with its own `unavailable` line, which makes a
     profile entry that never composed visible instead of leaving the page with
     no trace of the plugin.
-  - No `settings.section` is added: the settings are few, and the Plugins page
-    is where the official settings pages already live.
+  - No `settings.section` is added: the settings are few, and they belong with
+    the plugin's own row rather than in the Settings sidebar.
+
+### Fixed
+
+- **Row configuration seat**: the first cut registered the settings page on
+  `plugins.item`, which the harness reserves for the official host-plane
+  settings pages — a bundle's configuration belongs in `plugins.bundle.config`
+  or `plugins.row.config`. The row on the package page therefore rendered as
+  plain text and could not be opened. Registering `plugins.row.config` under
+  `dsh-reme-auto-router#dsh-reme-auto-router` makes it a clickable control that
+  opens the form.
 - **`llm` configuration section (mirrors dsh-user-approval's settings
   shape)**: `provider` / `model` are `string | null` — `null` inherits
   the host default-model selection (`agentDefaultModel.currentSelection()`),

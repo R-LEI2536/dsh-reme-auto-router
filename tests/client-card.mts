@@ -1,12 +1,13 @@
 /**
  * reme-auto-router — browser-half contract test.
  *
- * Locks the Plugins-page card added in 0.4.1:
- *   1. `LlmScope` projects the entry's nested `llm` section as four flat
- *      fields and nests every staged path operation back under `llm`, which is
- *      what lets the official staged form model edit a nested section.
- *   2. `cardSeatOptions` claims exactly one `plugins.item` seat with the card's
- *      id, order, dictionary binding, and injected form face.
+ * Locks the Plugins-page settings page added in 0.4.1:
+ *   1. `LlmScope` projects the entry's nested `llm` section as flat fields and
+ *      nests every staged path operation back under `llm`, which is what lets
+ *      the official staged form model edit a nested section.
+ *   2. `rowSeatOptions` claims the bundle's own `plugins.row.config` seat under
+ *      the page's `<package name>#<row id>` key, with the dictionary binding
+ *      and injected form face.
  *   3. The built `lib/client.js` hands off under the package name, carries the
  *      seat registration, and requires platform modules only (skipped until the
  *      artifact is built: run `pnpm run build` first to include it).
@@ -25,9 +26,9 @@ import { readFileSync } from 'node:fs'
 import { DEFAULT_SETTINGS, type RemeAutoRouterSettings } from '../src/settings-schema.ts'
 import { LlmScope } from '../src/client/llm-form-scope.ts'
 import {
-  CARD_ID, CARD_ORDER, CLIENT_INJECT, ENTRY_ID, NS, cardSeatOptions,
-  type CardSeatOptions,
-} from '../src/client/card-seat.ts'
+  CLIENT_INJECT, ENTRY_ID, NS, PACKAGE_NAME, ROW_KEY, rowSeatOptions,
+  type RowSeatOptions,
+} from '../src/client/row-seat.ts'
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
@@ -135,7 +136,7 @@ async function main(): Promise<void> {
     const accepted = await scope.mutate(
       [
         { op: 'set', path: ['provider'], value: 'opencode-chat' },
-        { op: 'unset', path: ['baseUrl'] },
+        { op: 'unset', path: ['model'] },
       ],
       3,
     )
@@ -150,7 +151,7 @@ async function main(): Promise<void> {
     )
     assert(write.ops[0]?.value === 'opencode-chat', 'a staged set keeps its value')
     assert(
-      write.ops[1]?.op === 'unset' && write.ops[1].path.join('.') === 'llm.baseUrl',
+      write.ops[1]?.op === 'unset' && write.ops[1].path.join('.') === 'llm.model',
       'a staged clear nests under llm',
     )
 
@@ -160,22 +161,21 @@ async function main(): Promise<void> {
     console.log('ok   LlmScope nests set/unset operations under llm')
   }
 
-  // 3. The seat contract: one Plugins-page card, bound to this plugin's entry
-  //    dictionary and staged-form face.
+  // 3. The seat contract: the bundle's own row page on the Plugins page, bound
+  //    to this plugin's entry dictionary and staged-form face.
   {
     const face = { hooks: { remeCard: {} }, edit: () => {}, resetField: () => {}, save: () => {}, discard: () => {} }
-    const options: CardSeatOptions = cardSeatOptions(key => `t:${key}`, () => face as never)
-    assert(options.name === 'plugins.item', 'the card claims the Plugins page official seat')
-    assert(options.id === CARD_ID && CARD_ID === 'reme-auto-router', 'the seat carries the card id')
-    assert(options.order === CARD_ORDER && CARD_ORDER === 50, 'the seat follows the official settings pages')
+    const options: RowSeatOptions = rowSeatOptions(() => face as never)
+    assert(options.name === 'plugins.row.config', 'the bundle claims the row configuration seat')
+    assert(ROW_KEY === `${PACKAGE_NAME}#${ENTRY_ID}`, `the seat answers the page row key, got ${ROW_KEY}`)
+    assert(options.key === ROW_KEY, 'the seat registration carries the row key')
     assert(options.locale === NS && NS === ENTRY_ID, 'one namespace names the dictionary and the edited entry')
-    assert(options.label() === 't:title', 'the seat label reads the card title from the dictionary')
     assert(options.inject() === (face as never), 'the seat injects the controller-built face')
     assert(
       CLIENT_INJECT.join(',') === 'slots,locale,configForms',
       `the browser half requires the slot, locale, and form services, got ${CLIENT_INJECT.join(',')}`,
     )
-    console.log('ok   cardSeatOptions claims one Plugins-page card seat')
+    console.log('ok   rowSeatOptions claims the bundle row seat')
   }
 
   // 4. The built artifact: the handoff id, the seat, and platform-only requires.
@@ -189,9 +189,8 @@ async function main(): Promise<void> {
         'the bundle hands off under the package name the loader keys its row by',
       )
       assert(artifact.includes('return module.exports; } });'), 'the factory returns the module exports')
-      assert(artifact.includes('"plugins.item"'), 'the artifact registers the Plugins page seat')
-      assert(artifact.includes(`"${CARD_ID}"`), 'the artifact carries the card id')
-      assert(/order:\s*(?:CARD_ORDER|50)\b/.test(artifact), 'the artifact carries the seat order')
+      assert(artifact.includes('"plugins.row.config"'), 'the artifact registers the row configuration seat')
+      assert(artifact.includes(`"${ROW_KEY}"`), 'the artifact carries the row key the page looks up')
       assert(artifact.includes(`"${ENTRY_ID}"`), 'the artifact binds the plugin entry id')
       const required = [...artifact.matchAll(/require\("([^"]+)"\)/g)].map(match => match[1]!)
       assert(required.length > 0, 'the artifact requires its platform modules')

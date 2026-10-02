@@ -67,19 +67,21 @@ source under `src/` for how each concept is realised.
   written only after `commands.execute` resolves, so the in-flight
   guard is what collapses the two push sources that fire on a single
   `ready` emit.
-- **plugins-page card** — The configuration entry point: a `plugins.item`
-  seat registered by the browser half (`src/client/`), listed in the
-  Plugins page's Official group. Renders **two** fields (Provider, Model —
-  the `smartProvider`/`smartModel` analogues; blank inherits the host
-  default-model selection) through the official `SettingsForm` /
-  `SettingsValueField`, with `LlmScope` nesting the card's flat field paths
-  back under `llm`. The credential reference (`apiKeyEnv`) and the endpoint
-  (`baseURL`) are not user-facing: they are derived from the effective
-  provider's DSH profile at spawn time (profile-named credential wins;
-  an unresolved named ref suppresses injection instead of using the probe
-  chain). No `settings.section` exists by design (few settings; avoid
-  polluting the Settings page). Registered unconditionally so an unserved
-  namespace shows the form's `unavailable` line instead of no card at all.
+- **plugin row page** — The configuration entry point: a `plugins.row.config`
+  seat registered by the browser half (`src/client/row-seat.ts`) under the key
+  `<package name>#<row id>` (`dsh-reme-auto-router#dsh-reme-auto-router`), so
+  the component row on the plugin's package page opens the form. Renders
+  **two** fields (Provider, Model — the `smartProvider`/`smartModel`
+  analogues; blank inherits the host default-model selection) through the
+  official `SettingsForm` / `SettingsValueField`, with `LlmScope` nesting the
+  flat field paths back under `llm`. The credential reference (`apiKeyEnv`) and
+  the endpoint (`baseURL`) are not user-facing: they are derived from the
+  effective provider's DSH profile at spawn time (profile-named credential
+  wins; an unresolved named ref suppresses injection instead of using the
+  probe chain). Neither `settings.section` nor `plugins.item` is used: the
+  former would pollute the Settings page, the latter is reserved for the
+  official host-plane settings pages. Registered unconditionally so an
+  unserved namespace shows the form's `unavailable` line instead of nothing.
 
 ## Tooling
 

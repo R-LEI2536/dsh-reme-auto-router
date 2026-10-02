@@ -1,16 +1,16 @@
 /**
  * reme-auto-router — browser half.
  *
- * Registers the plugin's page on the Plugins page (`plugins.item`), where the
- * Host-served `llm` settings section is edited through the shared settings
- * form. The card is registered unconditionally: a namespace the Host does not
- * serve still shows the card with the form's own "unavailable" line, which
- * turns a profile entry that never composed into something visible instead of
- * a page that silently has no trace of the plugin.
+ * Registers the plugin's settings page on the Plugins page's **row** seat
+ * (`plugins.row.config`), so opening the plugin's package and then its
+ * component shows the form — the flow a bundle's own configuration uses. The
+ * seat is registered unconditionally: a namespace the Host does not serve still
+ * renders the card with the form's own "unavailable" line, which turns a
+ * profile entry that never composed into something visible instead of a page
+ * that silently has no trace of the plugin.
  *
  * The Settings page itself carries no section for this plugin — the settings
- * are few, and the Plugins page is where the official settings pages already
- * live.
+ * are few, and they belong with the plugin's own row.
  *
  * @module reme-auto-router/client
  */
@@ -18,7 +18,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-// Type-only: the Plugins page's SlotMap merge (the 'plugins.item' entry).
+// Type-only: the Plugins page's SlotMap merge (the row-config seat).
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 // Type-only: the ui-renderer Context merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -27,22 +27,22 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: the locale namespace map this file augments, and the slot props.
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { RemeCard } from './RemeCard.tsx'
-import { CLIENT_INJECT, ENTRY_ID, NS, cardSeatOptions } from './card-seat.ts'
+import { CLIENT_INJECT, ENTRY_ID, NS, rowSeatOptions } from './row-seat.ts'
 import { LlmScope } from './llm-form-scope.ts'
 import { RemeCardController } from './reme-card-controller.ts'
 import { en, zh, type RemeSettingsLocaleKey } from './locales.ts'
 import type { RemeAutoRouterSettings } from '../settings-schema.ts'
 
 export type { RemeCardProps } from './RemeCard.tsx'
-export type { CardSeatOptions } from './card-seat.ts'
 export type { RemeCardFace, RemeCardFields, RemeCardState } from './reme-card-controller.ts'
 export type { RemeLlmFields } from './llm-form-scope.ts'
 export type { RemeSettingsLocaleKey } from './locales.ts'
-export { ENTRY_ID, NS } from './card-seat.ts'
+export type { RowSeatOptions } from './row-seat.ts'
+export { ENTRY_ID, NS, PACKAGE_NAME, ROW_KEY } from './row-seat.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** reme-auto-router's Plugins-page card copy. */
+    /** reme-auto-router's Plugins-page settings copy. */
     'dsh-reme-auto-router': RemeSettingsLocaleKey
   }
 }
@@ -51,16 +51,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const inject = [...CLIENT_INJECT]
 
 /**
- * Mount the plugin's Plugins-page card.
+ * Mount the plugin's Plugins-page settings page.
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS)
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'reme-auto-router: card dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'reme-auto-router: settings dictionaries')
   const controller = new RemeCardController(new LlmScope(ctx.configForms.get<RemeAutoRouterSettings>(ENTRY_ID)))
   ctx.effect(() => () => { controller.dispose() }, 'reme-auto-router: form subscription')
   ctx.effect(
-    () => ctx.slots.inject('plugins.item', () => ctx.slots.register(cardSeatOptions(t, () => controller.inject()), RemeCard)),
-    'reme-auto-router: plugins page card',
+    () => ctx.slots.inject('plugins.row.config', () => ctx.slots.register(rowSeatOptions(() => controller.inject()), RemeCard)),
+    'reme-auto-router: row settings page',
   )
 }

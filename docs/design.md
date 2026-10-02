@@ -382,7 +382,7 @@ pinnedDirs: []                # string[], cwd realpath
 - src/client/RemeCard.tsx — 卡片视图（summary 一行 / page 表单），官方 `SettingsForm` + `SettingsValueField`
 - src/client/index.ts — apply：注册词典 + 无条件注册 `plugins.item` 席位
 - scripts/build-client.mjs — esbuild 产出 `lib/client.js`（module-loader handoff，external 仅平台模块）
-- tests/client-card.mts — LlmScope 投影/嵌套、席位契约、产物 handoff 断言
+- tests/client-card.mts — LlmScope 投影/嵌套、row 席位契约（含 key 不变量）、产物 handoff 断言
 
 **已废弃**（不再使用，源文件已删除）：
 - status-section.ts — systemPrompt 注册路径已删除；用户感知改走 slash-command + push-notifier 的卡片通道
@@ -461,15 +461,24 @@ schema 只是**服务端契约**，Web UI 里所有渲染位都是**客户端 sl
 所以在 Web UI 里**完全没有入口**——这正是「设置页/插件页都找不到」的根因。
 
 v0.4.1 补齐浏览器半区：`src/client/*` + `package.json#dsh.client` + `lib/client.js`
-（module-loader 契约 `window.__ModuleLoader__.load({ id, factory })`），注册一张
-`plugins.item` 卡片，用官方 `SettingsForm` / `SettingsValueField` + `SettingsFormModel`
-渲染表单。因为官方表单模型只寻址**顶层**字段（`path: [field]`、`Object.hasOwn(user, field)`），
-而本插件的 LLM 配置在 `llm` 子对象里，故加一层 `LlmScope` 适配器把顶层字段 op 嵌回
-`llm.*`——服务端 `isVolatilePath` 允许 volatile 子树下的任意路径，schema 无需改形状。
+（module-loader 契约 `window.__ModuleLoader__.load({ id, factory })`），用官方
+`SettingsForm` / `SettingsValueField` + `SettingsFormModel` 渲染表单。因为官方表单模型
+只寻址**顶层**字段（`path: [field]`、`Object.hasOwn(user, field)`），而本插件的 LLM
+配置在 `llm` 子对象里，故加一层 `LlmScope` 适配器把顶层字段 op 嵌回 `llm.*`——服务端
+`isVolatilePath` 允许 volatile 子树下的任意路径，schema 无需改形状。
+
+**席位更正（0.4.1 内）**：最初挂的是 `plugins.item`，实测「点不进去」——那个席位是
+**官方 host-plane 设置页专用**（slot 契约原文：*a bundle's configuration belongs in
+`plugins.bundle.config` or `plugins.row.config` instead*）。bundle 自己的配置应挂
+`plugins.row.config`，key = `<包名>#<rowId>`（`rowConfigKey`；rowId 即 patch 行的 `id`，
+`boot/plugin-manager/src/index.ts` 里 `rows.push({ rowId: row.id, … })`）。注册后插件包页
+「包含的组件」那一行会变成带箭头的可点按钮，点开即 `RowDetail` 渲染的表单——正是
+「打开插件 → 打开它的组件」这一预期路径。key 在 `row-seat.ts` 里写字面量（跨包 value
+import 是模块表答不了的 require），测试断言它等于 `PACKAGE_NAME + '#' + ENTRY_ID`。
 
 **刻意不做 `settings.section`**：配置项少，不单开设置页分区（避免污染设置页）；
-入口就是插件页卡片。卡片**无条件注册**：命名空间未 serve 时表单显示 unavailable 行，
-把「profile 没组合 entry」这个失败模式暴露出来，而不是整页消失。
+入口就是插件包页里那一行组件。席位**无条件注册**：命名空间未 serve 时表单显示
+unavailable 行，把「profile 没组合 entry」这个失败模式暴露出来，而不是整页消失。
 
 **卡片只两个字段**（对齐 user-approval 的 `smartProvider`/`smartModel`）：Provider + Model，
 留空继承宿主默认。credential ref 与端点**不暴露给用户**，spawn 时从"生效后的 provider"
