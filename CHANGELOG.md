@@ -38,6 +38,24 @@ versions adhere to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Double spawn and port collision**: `ensure(cwd)` checked the instance map
+  and then `spawn()` awaited the LLM-env resolution *before* installing
+  anything. Two concurrent `ensure(cwd)` calls — two workspace events, two
+  sessions — therefore started **two** reme children for one cwd, and a spawn
+  for a second cwd was handed the same port, because `allocatePort` only knows
+  the ports `state.json` holds records for. Both children raced for the port,
+  the loser died and the winner served untracked, which surfaced as ready →
+  unavailable flapping (the fingerprint: two `Initializing ReMe Application`
+  sequences in one seconds-resolution reme log file). `spawn()` now reserves its
+  port synchronously, before its first `await`, and `ensure` collapses
+  concurrent calls for one cwd onto a single in-flight spawn
+  (`tests/process-manager-spawn.mts` fails on the pre-fix ordering).
+- **Exit diagnostics and a wedged slot**: an unexpected child exit now logs the
+  retained tail of the child's collected output (with the injected key
+  redacted) next to `code=… signal=…`, so the reason is visible instead of just
+  the code; a `done` rejection releases the reserved port so the next
+  `ensure(cwd)` retries instead of leaving the port booked. The instance is
+  installed only once a child exists, so a failed start still pushes nothing.
 - **Row configuration seat**: the first cut registered the settings page on
   `plugins.item`, which the harness reserves for the official host-plane
   settings pages — a bundle's configuration belongs in `plugins.bundle.config`

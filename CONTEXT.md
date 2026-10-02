@@ -89,5 +89,21 @@ source under `src/` for how each concept is realised.
   exposes `done`, `terminate()`, `waitForExit()`, stdio streams, and
   collected outputs; **no `pid`**. Only `SubprocessTerminalHandle`
   retains `pid`. See ADR-0001.
+- **spawn reservation** — `ProcessManager.spawn(cwd)` writes its port into
+  state.json **before** its first `await` (`allocatePort` only knows the ports
+  state.json holds records for), and `ensure(cwd)` collapses concurrent calls
+  for one cwd onto a single in-flight spawn. Two workspace events or two
+  sessions therefore produce one child on one port. The instance itself enters
+  the live map only once a child exists, so a failed start is never observable
+  by readers (`manager.get`) and pushes no status card. Without the reservation
+  two children race for the port: the loser dies, the winner serves untracked,
+  and the state flaps ready → unavailable (two `Initializing ReMe Application`
+  sequences in one seconds-resolution reme log file are its fingerprint).
+- **exit diagnostics** — an unexpected child exit (the instance is still
+  tracked) marks it `unavailable`, keeps `code=… signal=…` in `lastError`, and
+  logs the retained tail of the child's collected output with the injected key
+  redacted. A `done` rejection (the provider could not start the process)
+  releases the slot, so the next `ensure(cwd)` retries instead of wedging on
+  `starting` forever.
 - **terminal handle** — DSH 0.1.5 `SubprocessTerminalHandle`. Not used
   by this plugin (we have no interactive terminal need).

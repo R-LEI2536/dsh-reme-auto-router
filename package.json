@@ -46,8 +46,9 @@
     "test:coordinator": "tsx tests/endpoint-coordinator.mts",
     "test:notifier": "tsx tests/push-notifier.mts",
     "test:llm-source": "tsx tests/llm-source.mts",
+    "test:process-manager": "tsx tests/process-manager-spawn.mts",
     "test:client-card": "tsx tests/client-card.mts",
-    "verify": "pnpm run typecheck && pnpm run test:import && pnpm run test:detector && pnpm run test:race && pnpm run test:apply && pnpm run test:coordinator && pnpm run test:notifier && pnpm run test:llm-source && pnpm run test:client-card"
+    "verify": "pnpm run typecheck && pnpm run test:import && pnpm run test:detector && pnpm run test:race && pnpm run test:apply && pnpm run test:coordinator && pnpm run test:notifier && pnpm run test:llm-source && pnpm run test:process-manager && pnpm run test:client-card"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.4",

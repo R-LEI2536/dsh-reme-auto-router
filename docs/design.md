@@ -46,6 +46,7 @@
 | 8 | 配置模型：插件 Config schema + `.volatile()` 字段（DSH 0.1.7 引入，0.2.0-rc.1+ 沿用）；设置页由 settings 服务自动生成 | `Config` 导出 + `settings-schema.ts` |
 | 9 | Shutdown：SIGTERM → grace → SIGKILL | `waitForIdleBeforeShutdown` 默认 false，可选 true |
 | 10 | 不注册 Tool | `reme_search` 由官方提供 |
+| 11 | spawn **先同步占位端口**（写 store 记录）再进第一个 await；同 cwd 并发由 `ensure` 的 in-flight 表合并；实例在子进程真正存在后才进 map；异常退出把子进程输出尾部记进日志（注入的 key 打码） | `ProcessManager.spawn()` / `ensure()`（回归：`tests/process-manager-spawn.mts`） |
 
 ---
 

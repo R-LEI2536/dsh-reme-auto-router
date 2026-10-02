@@ -59,6 +59,8 @@ export interface ProcessManagerDeps {
 }
 export declare class ProcessManager {
     private readonly instances;
+    /** In-flight spawn per cwd, so concurrent `ensure(cwd)` collapses onto one child. */
+    private readonly pending;
     private readonly idleTimers;
     private readonly listeners;
     private readonly dep;
