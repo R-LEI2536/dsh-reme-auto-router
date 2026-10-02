@@ -2,19 +2,36 @@
  * reme-auto-router — LLM configuration sourced from DSH at spawn time.
  *
  * Mirrors dsh-user-approval's settings shape and service access: the
- * plugin NEVER reads or writes a key file. `provider` / `model` follow
- * the `smartProvider` / `smartModel` convention — `null` inherits the
- * host default-model selection (`agentDefaultModel.currentSelection()`),
- * a non-null value pins the exact provider route / model id the user
- * configured in DSH. The API key is resolved once per spawn through the
- * credentials seam (`ctx.get('credentials')`), whose layering is
- * `inherited env → $DSH_HOME/.credentials.yaml → DSH's own .env` — the
- * same source DSH's own LLM provider resolves at request time, so the
- * key is never read from the workspace or from any plaintext file this
- * plugin controls.
+ * plugin NEVER reads or writes a key file, and the user only names a
+ * provider route and a model — `null` inherits the host default-model
+ * selection (`agentDefaultModel.currentSelection()`), exactly like
+ * dsh-user-approval's `smartProvider` / `smartModel`. Everything reme's
+ * child process needs beyond that is derived from the provider's own DSH
+ * profile:
  *
- * Coherence gate: the trio (key, base URL, model) is only injected when
- * a key resolves. Without a key the function returns `undefined` and the
+ *   - the credential reference is the profile's `apiKeyEnv`, resolved
+ *     through the credentials seam (`ctx.get('credentials')`), whose
+ *     layering is `inherited env → $DSH_HOME/.credentials.yaml → DSH's own
+ *     .env` — the same source DSH's own LLM provider resolves at request
+ *     time;
+ *   - the endpoint is the profile's `baseURL` (deepseek routes fall back
+ *     to the official endpoint when their profile names none).
+ *
+ * The provider profile is read the way the harness itself reads it
+ * (`hasProviderApiKey` in the session controller): the LLM registry's
+ * configurable-provider directory names the settings namespace and the path
+ * to the profile, and `settings.describe({ redactSecrets: true })` carries
+ * its plain values. A named credential that does not resolve is NOT
+ * replaced by the probe chain — picking up an unrelated ambient key would
+ * bill another tenant, and failing loud is what llm-pi-ai itself does; the
+ * chain only applies when no profile names a credential at all.
+ *
+ * Both overrides stay available to deployers through the Config schema
+ * (`llm.apiKeyRef`, `llm.baseUrl`); the plugin's UI card does not render
+ * them.
+ *
+ * Coherence gate: the trio (key, base URL, model) is only injected when a
+ * key resolves. Without a key the function returns `undefined` and the
  * spawned reme keeps today's behaviour (its own env / `.env`).
  *
  * @module reme-auto-router/llm-source
@@ -40,21 +57,53 @@ export interface RemeDefaultModelService {
         model: string;
     };
 }
+/**
+ * Structural slice of the host settings service: the plain values of every
+ * live plugin entry, keyed by namespace (the profile entry id).
+ */
+export interface RemeSettingsService {
+    /** Read active plugin schemas and their live values, redacted for wire use. */
+    describe(options: {
+        redactSecrets: boolean;
+    }): readonly {
+        ns: string;
+        value?: unknown;
+    }[];
+}
+/** One provider route the host LLM registry can activate through settings. */
+export interface RemeConfigurableProvider {
+    /** Provider route key this entry activates when configured. */
+    provider: string;
+    /** Settings namespace whose section configures this provider. */
+    settingsNs: string;
+    /** Path from that namespace's section root to this provider's profile object. */
+    settingsPath: readonly string[];
+}
+/** Structural slice of the host LLM registry (core service `llm`). */
+export interface RemeLlmRegistry {
+    /** Provider routes configuration can activate, whether or not they are live. */
+    listConfigurableProviders(): readonly RemeConfigurableProvider[];
+}
+/** Minimal logger surface; logging must never block a spawn. */
+export interface RemeLogger {
+    warn(message: string): void;
+}
 /** Settings slice consumed by {@link resolveRemeLlmEnv}. */
 export interface RemeLlmSettings {
     /** DSH provider route name; `null` inherits the host default-model selection. */
     provider: string | null;
     /** Model id; `null` inherits the host default-model selection. */
     model: string | null;
-    /** Credential ref for the API key; `null` probes {@link DEFAULT_API_KEY_REF_CHAIN}. */
+    /** Deployer override for the credential ref; `null` derives it from the provider profile. */
     apiKeyRef: string | null;
-    /** OpenAI-compatible base URL; `null` disables injection. */
+    /** Deployer override for the OpenAI-compatible base URL; `null` derives it from the provider profile. */
     baseUrl: string | null;
 }
 /**
  * Minimal cordis `Context` surface consumed: `get`. Structural on
- * purpose — the seam lookups (`credentials`, `agentDefaultModel`) are
- * optional at runtime, and a stub with just `get` is enough for tests.
+ * purpose — the seam lookups (`credentials`, `agentDefaultModel`, `llm`,
+ * `settings`, `logger`) are optional at runtime, and a stub with just
+ * `get` is enough for tests.
  */
 export interface RemeCtxGet {
     get<T = unknown>(name: string): T | undefined;
@@ -72,10 +121,24 @@ export interface RemeLlmEnv {
     /** Effective OpenAI-compatible base URL, when known. */
     baseUrl?: string;
 }
-/** Credential references probed in order when `apiKeyRef` is not configured. */
+/** Credential references probed in order when no profile and no setting name one. */
 export declare const DEFAULT_API_KEY_REF_CHAIN: readonly ["DEEPSEEK_API_KEY", "LLM_API_KEY", "OPENAI_API_KEY"];
 /** OpenAI-compatible endpoint for the official DeepSeek route. */
 export declare const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+/** What a provider's DSH profile contributes to the spawn environment. */
+export interface RemeProviderProfile {
+    /** Credential reference the profile names, when it names one. */
+    apiKeyEnv?: string;
+    /** OpenAI-compatible endpoint the profile declares, when it declares one. */
+    baseURL?: string;
+}
+/**
+ * Look a provider route up in the host's LLM registry and settings document.
+ * @param ctx - host context carrying the `llm` and `settings` services.
+ * @param route - provider route name (as `agentDefaultModel` or the setting spells it).
+ * @returns the profile's credential reference and endpoint, when it declares either.
+ */
+export declare function resolveProviderProfile(ctx: RemeCtxGet, route: string): RemeProviderProfile | undefined;
 /**
  * Resolve the LLM environment for one spawned reme process.
  *

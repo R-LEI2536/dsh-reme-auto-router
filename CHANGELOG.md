@@ -23,6 +23,11 @@ versions adhere to [Semantic Versioning](https://semver.org/).
     `Object.hasOwn(user, field)`), nesting each staged path operation back under
     `llm`. The Host accepts those paths (`isVolatilePath`), so the Config schema
     keeps its shape.
+  - The card edits **two fields only** — Provider and Model, the same knobs
+    dsh-user-approval exposes as `smartProvider` / `smartModel` (blank inherits
+    the host default-model selection). The credential reference and the endpoint
+    are **derived from the provider's own DSH profile** at spawn time, so the
+    user never types them.
   - The card is registered unconditionally: a namespace the Host does not serve
     still shows the card with the form's own `unavailable` line, which makes a
     profile entry that never composed visible instead of leaving the page with
@@ -33,15 +38,21 @@ versions adhere to [Semantic Versioning](https://semver.org/).
   shape)**: `provider` / `model` are `string | null` — `null` inherits
   the host default-model selection (`agentDefaultModel.currentSelection()`),
   a non-null value pins the exact provider route / model id configured in
-  DSH. `apiKeyRef` selects the credential reference resolved for the API
-  key, probing `DEEPSEEK_API_KEY` → `LLM_API_KEY` → `OPENAI_API_KEY` when
-  left null; `baseUrl` overrides the OpenAI-compatible endpoint (deepseek
-  providers default to `https://api.deepseek.com`).
+  DSH. They are the only user-facing fields. `apiKeyRef` and `baseUrl` remain
+  in the schema as **deployer-only overrides** (not rendered by the card).
 - **`src/llm-source.ts`**: spawn-time resolution of the reme LLM env from
   the DSH credentials seam (`ctx.get('credentials')`) — the same
   env → `$DSH_HOME/.credentials.yaml` → DSH `.env` layering DSH's own LLM
   provider uses, so the key never comes from a plaintext file this plugin
-  reads or writes. Coherence gate: nothing is injected when no key
+  reads or writes. The credential reference (`apiKeyEnv`) and the endpoint
+  (`baseURL`) are read from the **effective** provider's profile through the
+  LLM registry's configurable-provider directory plus
+  `settings.describe({ redactSecrets: true })` — the same path the harness's
+  own `hasProviderApiKey()` takes. A profile that names a credential owns the
+  choice: an unresolved named reference suppresses injection and logs the miss
+  rather than falling back to an unrelated ambient key; the probe chain
+  (`DEEPSEEK_API_KEY` → `LLM_API_KEY` → `OPENAI_API_KEY`) applies only when no
+  profile names one. Coherence gate: nothing is injected when no key
   resolves (reme keeps its own env / `.env` behaviour); empty values are
   never injected.
 
@@ -62,8 +73,9 @@ versions adhere to [Semantic Versioning](https://semver.org/).
   the optional client peer dependencies are declared. The Node build excludes
   `src/client` (the browser half is bundled by esbuild only).
 - **Tests**: new `tests/client-card.mts` (nested projection, `llm.*` path
-  nesting + write fence, seat contract, built-artifact handoff and
-  platform-only requires) wired into `pnpm run verify`.
+  nesting + write fence, seat contract, built-artifact handoff,
+  platform-only requires, and a guard that the deployer-only fields stay out of
+  the browser bundle) wired into `pnpm run verify`.
 - **Tests**: new `tests/llm-source.mts` (credentials seam absent,
   probe-chain fallback, explicit `apiKeyRef`, empty-value skip, model
   inheritance, baseUrl defaults, key-gate) wired into `pnpm run verify`.

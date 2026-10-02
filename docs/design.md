@@ -378,7 +378,7 @@ pinnedDirs: []                # string[], cwd realpath
 **v0.4.1 新增（浏览器半区）**：
 - src/client/card-seat.ts — 插件页席位描述符（id / order / 词典 / inject face），纯类型依赖，可在 Node 直测
 - src/client/llm-form-scope.ts — `LlmScope`：`llm` 嵌套小节的扁平投影 + 写路径嵌回 `llm.*`
-- src/client/reme-card-controller.ts — `SettingsFormModel` 暂存表单（4 个 LLM 字段）
+- src/client/reme-card-controller.ts — `SettingsFormModel` 暂存表单（Provider / Model 两个字段）
 - src/client/RemeCard.tsx — 卡片视图（summary 一行 / page 表单），官方 `SettingsForm` + `SettingsValueField`
 - src/client/index.ts — apply：注册词典 + 无条件注册 `plugins.item` 席位
 - scripts/build-client.mjs — esbuild 产出 `lib/client.js`（module-loader handoff，external 仅平台模块）
@@ -470,6 +470,16 @@ v0.4.1 补齐浏览器半区：`src/client/*` + `package.json#dsh.client` + `lib
 **刻意不做 `settings.section`**：配置项少，不单开设置页分区（避免污染设置页）；
 入口就是插件页卡片。卡片**无条件注册**：命名空间未 serve 时表单显示 unavailable 行，
 把「profile 没组合 entry」这个失败模式暴露出来，而不是整页消失。
+
+**卡片只两个字段**（对齐 user-approval 的 `smartProvider`/`smartModel`）：Provider + Model，
+留空继承宿主默认。credential ref 与端点**不暴露给用户**，spawn 时从"生效后的 provider"
+在 DSH 里的 profile 推导——`ctx.llm.listConfigurableProviders()` 给出该 route 的
+`settingsNs` + `settingsPath`，`ctx.get('settings').describe({redactSecrets:true})` 给出
+`apiKeyEnv` / `baseURL`（与 harness 自己的 `hasProviderApiKey()` 同一条读取路径）。
+优先级：`llm.apiKeyRef`/`llm.baseUrl`（部署方覆盖）→ profile → 探测链/deepseek 默认端点。
+安全语义：profile 命名了 credential 就只认它，解析不到即**不注入 + warn**（不回落 ambient key，
+避免跨租户计费）；只有 profile 完全没命名时才用探测链。`llm.apiKeyRef` / `llm.baseUrl`
+保留在 schema 里作为部署方 yaml 覆盖项。
 
 ### 16.3 [P2] publish 链路 + GitHub Actions
 

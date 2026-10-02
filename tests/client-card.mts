@@ -199,6 +199,10 @@ async function main(): Promise<void> {
         assert(PLATFORM_MODULES.has(specifier), `the artifact requires a platform module, got ${specifier}`)
       }
       assert(!artifact.includes('schemastery'), 'no Host-only schema dependency leaks into the browser bundle')
+      // The card exposes provider/model only; the credential reference and the
+      // endpoint are derived from the provider's DSH profile server-side.
+      assert(!artifact.includes('apiKeyRef'), 'the card must not render the deployer-only credential-ref field')
+      assert(!artifact.includes('baseUrl'), 'the card must not render the deployer-only endpoint field')
       console.log(`ok   lib/client.js hands off under its package name (requires: ${[...new Set(required)].join(', ')})`)
     }
   }

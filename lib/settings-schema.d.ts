@@ -52,13 +52,17 @@ export declare const SettingsConfig: z<Schemastery.ObjectS<NoInfer<{
     pinnedDirs: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
     /**
      * LLM configuration handed to spawned reme processes, sourced from
-     * DSH at spawn time (see README "配置" section). Field shape mirrors
-     * dsh-user-approval's `smartProvider`/`smartModel`: `null` inherits
-     * the host default-model selection (`agentDefaultModel.currentSelection()`),
-     * a non-null value pins the exact provider route / model id the user
-     * configured in DSH. `apiKeyRef` selects the credential reference the
-     * key is resolved from; `baseUrl` overrides the OpenAI-compatible
-     * endpoint (deepseek providers default to `https://api.deepseek.com`).
+     * DSH at spawn time (see README "配置" section). The user-facing card
+     * renders only `provider` / `model` — the same two knobs
+     * dsh-user-approval exposes as `smartProvider` / `smartModel`: `null`
+     * inherits the host default-model selection
+     * (`agentDefaultModel.currentSelection()`), a non-null value pins the
+     * exact provider route / model id the user configured in DSH.
+     *
+     * `apiKeyRef` and `baseUrl` are **deployer-only overrides**: by default
+     * the credential reference (`apiKeyEnv`) and the endpoint (`baseURL`)
+     * are derived from the effective provider's own DSH profile, so a user
+     * never types them.
      */
     llm: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         provider: z<string | null, string | null, "defined">;
@@ -96,13 +100,17 @@ export declare const SettingsConfig: z<Schemastery.ObjectS<NoInfer<{
     pinnedDirs: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
     /**
      * LLM configuration handed to spawned reme processes, sourced from
-     * DSH at spawn time (see README "配置" section). Field shape mirrors
-     * dsh-user-approval's `smartProvider`/`smartModel`: `null` inherits
-     * the host default-model selection (`agentDefaultModel.currentSelection()`),
-     * a non-null value pins the exact provider route / model id the user
-     * configured in DSH. `apiKeyRef` selects the credential reference the
-     * key is resolved from; `baseUrl` overrides the OpenAI-compatible
-     * endpoint (deepseek providers default to `https://api.deepseek.com`).
+     * DSH at spawn time (see README "配置" section). The user-facing card
+     * renders only `provider` / `model` — the same two knobs
+     * dsh-user-approval exposes as `smartProvider` / `smartModel`: `null`
+     * inherits the host default-model selection
+     * (`agentDefaultModel.currentSelection()`), a non-null value pins the
+     * exact provider route / model id the user configured in DSH.
+     *
+     * `apiKeyRef` and `baseUrl` are **deployer-only overrides**: by default
+     * the credential reference (`apiKeyEnv`) and the endpoint (`baseURL`)
+     * are derived from the effective provider's own DSH profile, so a user
+     * never types them.
      */
     llm: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         provider: z<string | null, string | null, "defined">;
@@ -148,17 +156,19 @@ export interface RemeAutoRouterSettings {
     /**
      * LLM configuration handed to spawned reme processes at spawn time.
      * `provider`/`model` are `null` to inherit the DSH default-model
-     * selection; `apiKeyRef` (`null` = probe chain) selects the credential
-     * reference; `baseUrl` (`null` = no injection) overrides the endpoint.
+     * selection and are the only fields the UI card renders; `apiKeyRef`
+     * (`null` = derive from the provider profile, then probe the default
+     * chain) and `baseUrl` (`null` = derive from the provider profile) are
+     * deployer-only overrides.
      */
     llm: {
         /** DSH provider route name; `null` inherits the host default-model selection. */
         provider: string | null;
         /** Model id; `null` inherits the host default-model selection. */
         model: string | null;
-        /** Credential ref for the API key; `null` probes DEEPSEEK_API_KEY → LLM_API_KEY → OPENAI_API_KEY. */
+        /** Deployer override: credential ref for the API key; `null` derives it from the provider profile. */
         apiKeyRef: string | null;
-        /** OpenAI-compatible base URL; `null` disables injection (deepseek providers default to `https://api.deepseek.com`). */
+        /** Deployer override: OpenAI-compatible base URL; `null` derives it from the provider profile. */
         baseUrl: string | null;
     };
 }

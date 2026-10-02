@@ -8,6 +8,10 @@
  * on the Host with the profile entry, so the card needs no separate sidebar
  * section and adds nothing to the Settings page.
  *
+ * Two fields only, mirroring dsh-user-approval's `smartProvider` /
+ * `smartModel`: the credential reference and the endpoint come from the chosen
+ * provider's DSH profile at spawn time.
+ *
  * @module reme-auto-router/RemeCard
  */
 
@@ -58,30 +62,6 @@ export function RemeCard(props: RemeCardProps) {
         {...state.model}
         onEdit={(text) => { props.edit('model', text) }}
         onReset={() => { props.resetField('model') }}
-      />
-      <SettingsValueField
-        id="plugin-config-reme-auto-router-api-key-ref"
-        label={t('apiKeyRef')}
-        hint={t('apiKeyRefHint')}
-        overriddenLabel={t('overridden')}
-        resetLabel={t('reset')}
-        invalidLabel={t('invalidText')}
-        disabled={disabled}
-        {...state.apiKeyRef}
-        onEdit={(text) => { props.edit('apiKeyRef', text) }}
-        onReset={() => { props.resetField('apiKeyRef') }}
-      />
-      <SettingsValueField
-        id="plugin-config-reme-auto-router-base-url"
-        label={t('baseUrl')}
-        hint={t('baseUrlHint')}
-        overriddenLabel={t('overridden')}
-        resetLabel={t('reset')}
-        invalidLabel={t('invalidText')}
-        disabled={disabled}
-        {...state.baseUrl}
-        onEdit={(text) => { props.edit('baseUrl', text) }}
-        onReset={() => { props.resetField('baseUrl') }}
       />
     </SettingsForm>
   )

@@ -4,7 +4,9 @@
  * The card copy follows the official settings pages: a title, a one-line
  * summary the Plugins page shows while the card is closed, one label and hint
  * per editable field, and the chrome strings the shared `SettingsForm` frame
- * renders.
+ * renders. Only the provider route and the model are user-facing; the
+ * credential reference and the endpoint are derived from the provider's DSH
+ * profile at spawn time.
  *
  * @module reme-auto-router/locales
  */
@@ -16,23 +18,17 @@ export type RemeSettingsLocaleKey =
   | 'title' | 'description'
   | 'provider' | 'providerHint'
   | 'model' | 'modelHint'
-  | 'apiKeyRef' | 'apiKeyRefHint'
-  | 'baseUrl' | 'baseUrlHint'
   | 'overridden' | 'reset' | 'readOnly' | 'unavailable'
   | 'save' | 'saving' | 'saveFailed' | 'invalidText'
 
 /** English copy. */
 export const en: Record<RemeSettingsLocaleKey, string> = {
   title: 'ReMe Auto Router',
-  description: 'Choose the LLM provider, model, credential reference, and endpoint handed to workspace-bound reme instances.',
+  description: 'Choose the DSH provider route and model handed to workspace-bound reme instances.',
   provider: 'Provider',
-  providerHint: 'DSH provider route for reme\u2019s LLM calls. Leave blank to inherit the host default-model selection.',
+  providerHint: 'DSH provider route reme calls its LLM through. Leave blank to inherit the host default-model selection. The credential and endpoint are read from this provider\u2019s DSH configuration.',
   model: 'Model',
-  modelHint: 'Model id for reme\u2019s LLM calls. Leave blank to inherit the host default-model selection.',
-  apiKeyRef: 'API key reference',
-  apiKeyRefHint: 'Credential reference the key is resolved from (inherited env, credentials store, DSH .env). Leave blank to probe DEEPSEEK_API_KEY \u2192 LLM_API_KEY \u2192 OPENAI_API_KEY.',
-  baseUrl: 'Base URL',
-  baseUrlHint: 'OpenAI-compatible endpoint for reme\u2019s LLM calls. Leave blank for no injection; a provider route starting with \u201cdeepseek\u201d defaults to https://api.deepseek.com.',
+  modelHint: 'Model id reme calls. Leave blank to inherit the host default-model selection.',
   overridden: 'Overridden',
   reset: 'Reset to default',
   readOnly: 'This deployment stores settings read-only.',
@@ -46,15 +42,11 @@ export const en: Record<RemeSettingsLocaleKey, string> = {
 /** Simplified Chinese copy. */
 export const zh: Record<RemeSettingsLocaleKey, string> = {
   title: 'ReMe 自动路由',
-  description: '配置交给工作区 reme 实例的 LLM:provider、模型、凭据引用与端点。',
+  description: '选择交给工作区 reme 实例的 DSH provider 路由与模型。',
   provider: 'Provider',
-  providerHint: 'reme 调用 LLM 用的 DSH provider 路由。留空则继承宿主默认模型选择。',
+  providerHint: 'reme 调用 LLM 用的 DSH provider 路由。留空则继承宿主默认模型选择;凭据与端点自动取自该 provider 在 DSH 里的配置。',
   model: 'Model',
   modelHint: 'reme 调用 LLM 用的模型 id。留空则继承宿主默认模型选择。',
-  apiKeyRef: 'API key 引用',
-  apiKeyRefHint: '解析 key 的凭据引用(继承环境变量、凭据库、DSH .env)。留空则依次探测 DEEPSEEK_API_KEY → LLM_API_KEY → OPENAI_API_KEY。',
-  baseUrl: 'Base URL',
-  baseUrlHint: 'reme 调用 LLM 用的 OpenAI 兼容端点。留空则不注入;provider 以 “deepseek” 开头时默认 https://api.deepseek.com。',
   overridden: '已覆盖',
   reset: '恢复默认',
   readOnly: '本部署的设置为只读。',

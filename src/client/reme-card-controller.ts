@@ -7,6 +7,12 @@
  * the card component renders that projection. Only a save writes; an emptied
  * field stages a clear, so the entry re-inherits the composition layer.
  *
+ * The card edits the same two knobs dsh-user-approval exposes
+ * (`smartProvider` / `smartModel`): the provider route and the model. The
+ * credential reference and the endpoint are derived from the provider's DSH
+ * profile at spawn time (see `src/llm-source.ts`) and their Config fields stay
+ * deployer-only, so the user never types them.
+ *
  * @module reme-auto-router/reme-card-controller
  */
 
@@ -18,7 +24,7 @@ import {
 import type { RemeLlmFields } from './llm-form-scope.ts'
 
 /** The LLM fields this card edits — a subset of the served schema by design. */
-export type RemeCardFields = RemeLlmFields
+export type RemeCardFields = Pick<RemeLlmFields, 'provider' | 'model'>
 
 /** What the Plugins-page card renders. */
 export interface RemeCardState extends SettingsFormShell {
@@ -26,10 +32,6 @@ export interface RemeCardState extends SettingsFormShell {
   provider: SettingsFieldState
   /** Model id handed to spawned reme instances. */
   model: SettingsFieldState
-  /** Credential reference the API key is resolved from. */
-  apiKeyRef: SettingsFieldState
-  /** OpenAI-compatible endpoint handed to spawned reme instances. */
-  baseUrl: SettingsFieldState
 }
 
 /** The registration-side face the card's slot entry injects. */
@@ -50,8 +52,6 @@ export class RemeCardController {
     this.form = new SettingsFormModel(scope, [
       settingsTextField('provider'),
       settingsTextField('model'),
-      settingsTextField('apiKeyRef'),
-      settingsTextField('baseUrl'),
     ])
     this.store = this.form.bind(() => this.projection())
   }
@@ -61,8 +61,6 @@ export class RemeCardController {
       ...this.form.shell(),
       provider: this.form.field('provider'),
       model: this.form.field('model'),
-      apiKeyRef: this.form.field('apiKeyRef'),
-      baseUrl: this.form.field('baseUrl'),
     }
   }
 

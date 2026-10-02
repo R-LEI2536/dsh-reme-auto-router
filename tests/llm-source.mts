@@ -14,7 +14,11 @@
  * Exits 0 on success, 1 on first failed assertion.
  */
 
-import { resolveRemeLlmEnv, type RemeCredentialsService, type RemeDefaultModelService } from '../src/llm-source.ts'
+import {
+  resolveRemeLlmEnv,
+  type RemeCredentialsService, type RemeDefaultModelService, type RemeLlmRegistry,
+  type RemeSettingsService,
+} from '../src/llm-source.ts'
 
 /** Minimal cordis Context stub: only the `get` surface llm-source uses. */
 class ContextStub {
@@ -40,6 +44,25 @@ function memoryCredentials(records: Record<string, string | undefined>): RemeCre
 /** Host default-model seam stub. */
 function defaultModel(selection: { provider: string; model: string }): RemeDefaultModelService {
   return { currentSelection: () => selection }
+}
+
+/** LLM registry stub: one configurable route per entry, profiles at `providers.<route>`. */
+function llmRegistry(routes: readonly string[], settingsNs = 'llm-pi-ai'): RemeLlmRegistry {
+  return {
+    listConfigurableProviders: () => routes.map(provider => ({
+      provider, settingsNs, settingsPath: ['providers', provider],
+    })),
+  }
+}
+
+/** Settings service stub: one namespace value per entry id. */
+function settingsService(namespaces: Record<string, unknown>): RemeSettingsService {
+  return { describe: () => Object.entries(namespaces).map(([ns, value]) => ({ ns, value })) }
+}
+
+/** One provider profile namespace shaped like the llm-pi-ai settings entry. */
+function providersNamespace(profiles: Record<string, object>): Record<string, unknown> {
+  return { 'llm-pi-ai': { providers: profiles } }
 }
 
 function assert(condition: boolean, message: string): asserts condition {
@@ -172,6 +195,118 @@ async function main(): Promise<void> {
     const env = await resolveRemeLlmEnv(ctx, { provider: 'deepseek-official', model: 'deepseek-chat', apiKeyRef: null, baseUrl: 'https://example.test/v1' })
     assert(env === undefined, 'no key must suppress the whole trio regardless of explicit settings')
     console.log('ok   key gate: unresolved key suppresses model/baseUrl too')
+  }
+
+  // 12. The headline case: with no LLM fields set, the credential and the
+  //     endpoint come from the INHERITED provider's own DSH profile.
+  {
+    const ctx = new ContextStub({
+      credentials: memoryCredentials({ OPENCODE_CHAT_API_KEY: 'sk-oc', DEEPSEEK_API_KEY: 'sk-chain' }),
+      agentDefaultModel: defaultModel({ provider: 'opencode-chat', model: 'deepseek-v4-flash' }),
+      llm: llmRegistry(['opencode-chat']),
+      settings: settingsService(providersNamespace({
+        'opencode-chat': { apiKeyEnv: 'OPENCODE_CHAT_API_KEY', baseURL: 'https://opencode.ai/zen/go/v1' },
+      })),
+    })
+    const env = await resolveRemeLlmEnv(ctx, noLlm)
+    assert(env !== undefined, 'a provider profile must supply the credential')
+    assert(env.keySource === 'OPENCODE_CHAT_API_KEY@file', `profile apiKeyEnv must be used, got ${env.keySource}`)
+    assert(env.baseUrl === 'https://opencode.ai/zen/go/v1', `profile baseURL must be used, got ${String(env.baseUrl)}`)
+    assert(env.provider === 'opencode-chat', 'the inherited provider is reported')
+    assert(env.model === 'deepseek-v4-flash', 'the inherited model is reported')
+    console.log('ok   provider profile supplies credential + endpoint (two-field card)')
+  }
+
+  // 13. A profile that NAMES a credential owns the choice: a miss must not fall
+  //     back to the probe chain (an unrelated ambient key would bill another
+  //     tenant), and the miss is logged.
+  {
+    const warnings: string[] = []
+    const ctx = new ContextStub({
+      credentials: memoryCredentials({ DEEPSEEK_API_KEY: 'sk-chain' }),
+      agentDefaultModel: defaultModel({ provider: 'opencode-chat', model: 'deepseek-v4-flash' }),
+      llm: llmRegistry(['opencode-chat']),
+      settings: settingsService(providersNamespace({
+        'opencode-chat': { apiKeyEnv: 'OPENCODE_CHAT_API_KEY', baseURL: 'https://opencode.ai/zen/go/v1' },
+      })),
+      logger: { warn: (message: string) => { warnings.push(message) } },
+    })
+    const env = await resolveRemeLlmEnv(ctx, noLlm)
+    assert(env === undefined, 'a named-but-missing credential must suppress injection, not use the chain')
+    assert(warnings.length === 1, `the miss must be logged once, got ${warnings.length}`)
+    assert(
+      warnings[0]?.includes('OPENCODE_CHAT_API_KEY') === true,
+      `the log must name the unresolved credential, got ${String(warnings[0])}`,
+    )
+    assert(warnings[0]?.includes('sk-chain') !== true, 'the log must never carry a key value')
+    console.log('ok   named credential miss fails loud (no ambient-key fallback)')
+  }
+
+  // 14. The deployer override for the credential ref beats the profile.
+  {
+    const ctx = new ContextStub({
+      credentials: memoryCredentials({ PROFILE_KEY: 'sk-profile', CUSTOM_REF: 'sk-custom' }),
+      agentDefaultModel: defaultModel({ provider: 'opencode-chat', model: 'm' }),
+      llm: llmRegistry(['opencode-chat']),
+      settings: settingsService(providersNamespace({ 'opencode-chat': { apiKeyEnv: 'PROFILE_KEY' } })),
+    })
+    const env = await resolveRemeLlmEnv(ctx, { provider: null, model: null, apiKeyRef: 'CUSTOM_REF', baseUrl: null })
+    assert(env !== undefined, 'an explicit ref must resolve')
+    assert(env.keySource === 'CUSTOM_REF@file', `explicit apiKeyRef must beat the profile, got ${env.keySource}`)
+    console.log('ok   deployer apiKeyRef override beats the provider profile')
+  }
+
+  // 15. The deployer override for the endpoint beats the profile.
+  {
+    const ctx = new ContextStub({
+      credentials: memoryCredentials({ PROFILE_KEY: 'sk-1' }),
+      agentDefaultModel: defaultModel({ provider: 'opencode-chat', model: 'm' }),
+      llm: llmRegistry(['opencode-chat']),
+      settings: settingsService(providersNamespace({
+        'opencode-chat': { apiKeyEnv: 'PROFILE_KEY', baseURL: 'https://profile.test/v1' },
+      })),
+    })
+    const env = await resolveRemeLlmEnv(ctx, { provider: null, model: null, apiKeyRef: null, baseUrl: 'https://override.test/v1' })
+    assert(env?.baseUrl === 'https://override.test/v1', `explicit baseUrl must win, got ${String(env?.baseUrl)}`)
+    console.log('ok   deployer baseUrl override beats the provider profile')
+  }
+
+  // 16. A profile that names no credential (account-style login) falls back to
+  //     the probe chain while still contributing its endpoint.
+  {
+    const ctx = new ContextStub({
+      credentials: memoryCredentials({ LLM_API_KEY: 'sk-chain' }),
+      agentDefaultModel: defaultModel({ provider: 'minimax-cn', model: 'm' }),
+      llm: llmRegistry(['minimax-cn']),
+      settings: settingsService(providersNamespace({ 'minimax-cn': { baseURL: 'https://api.minimax.test/v1' } })),
+    })
+    const env = await resolveRemeLlmEnv(ctx, noLlm)
+    assert(env !== undefined, 'the probe chain must still resolve when no credential is named')
+    assert(env.keySource === 'LLM_API_KEY@file', `probe chain must supply the key, got ${env.keySource}`)
+    assert(env.baseUrl === 'https://api.minimax.test/v1', 'the profile still contributes its endpoint')
+    console.log('ok   profile without apiKeyEnv → probe chain, endpoint still derived')
+  }
+
+  // 17. An unknown route (or a missing registry) leaves the legacy behaviour
+  //     untouched: probe chain, and no endpoint for a non-deepseek provider.
+  {
+    const ctx = new ContextStub({
+      credentials: memoryCredentials({ DEEPSEEK_API_KEY: 'sk-chain' }),
+      agentDefaultModel: defaultModel({ provider: 'ghost-route', model: 'm' }),
+      llm: llmRegistry(['opencode-chat']),
+      settings: settingsService(providersNamespace({ 'opencode-chat': { apiKeyEnv: 'NOPE' } })),
+    })
+    const env = await resolveRemeLlmEnv(ctx, noLlm)
+    assert(env !== undefined && env.keySource === 'DEEPSEEK_API_KEY@file', 'an unknown route falls back to the chain')
+    assert(env.baseUrl === undefined, 'an unknown non-deepseek route injects no endpoint')
+
+    const noServices = new ContextStub({
+      credentials: memoryCredentials({ DEEPSEEK_API_KEY: 'sk-chain' }),
+      agentDefaultModel: defaultModel({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+    })
+    const legacy = await resolveRemeLlmEnv(noServices, noLlm)
+    assert(legacy?.baseUrl === 'https://api.deepseek.com', 'without the registry the deepseek default still applies')
+    console.log('ok   unknown route / missing registry → legacy behaviour')
   }
 
   console.log('\nllm-source: all checks passed')

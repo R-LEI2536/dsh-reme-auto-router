@@ -58,9 +58,9 @@ dsh plugin --profile web add "link:/absolute/path/to/dsh-reme-auto-router"
 
 1. Web UI → **插件**
 2. **Official** 组里点 **ReMe Auto Router** 卡片
-3. 改 Provider / Model / API key 引用 / Base URL → **保存**
+3. 只填两个字段：**Provider** / **Model**（通常两个都留空即可）→ **保存**
 
-保存写入当前 profile `cordis.patch.yml` 的用户层（`dsh-reme-auto-router` 的 `config.llm`），live 生效、无需重启；留空 = 继承/不注入（见下节语义）。
+保存写入当前 profile `cordis.patch.yml` 的用户层（`dsh-reme-auto-router` 的 `config.llm`），live 生效、无需重启；留空 = 继承宿主默认。**API key 与端点不用填**：它们在 spawn 时从所选 provider 的 DSH 配置里自动读（见下节）。
 
 > 卡片若显示「宿主当前没有提供本插件的设置命名空间」，说明该 profile 没有组合本插件的 entry（未启用 / bundle 未加载）：`dsh plugin --profile web add …` 后重启 DSH，入口就会出现。
 
@@ -76,22 +76,30 @@ adoptManual: true                     # 是否探测并认领用户手动启动�
 ports: { base: 2333, range: 67 }      # 顺序分配的端口范围
 pinnedDirs: []                        # cwd realpath 列表，pin 的永不 idle stop
 llm:                                  # spawn reme 时从 DSH 注入的 LLM 配置（见下）
-  provider: null                      # DSH provider route 名；null = 继承 DSH 默认
-  model: null                         # 模型 id；null = 继承 DSH 默认
-  apiKeyRef: null                     # credential ref；null = DEEPSEEK_API_KEY → LLM_API_KEY → OPENAI_API_KEY
-  baseUrl: null                       # OpenAI 兼容端点；null = 不注入（deepseek 官方自动给 https://api.deepseek.com）
+  provider: null                      # DSH provider route 名；null = 继承 DSH 默认（卡片上的 Provider）
+  model: null                         # 模型 id；null = 继承 DSH 默认（卡片上的 Model）
+  apiKeyRef: null                     # 【部署方覆盖】credential ref；null = 从 provider 配置推导，再退探测链
+  baseUrl: null                       # 【部署方覆盖】OpenAI 兼容端点；null = 从 provider 配置推导
 ```
 
-### `llm` 小节:让 reme 用上你 DSH 里配好的 provider(照 DSH User Approval 的设置形态)
+### `llm` 小节：让 reme 用上你 DSH 里配好的 provider（照 DSH User Approval 的设置形态）
 
-启动 reme 时,插件从 DSH 运行时取 LLM 配置注入子进程 env(`LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL_NAME`),**不读、不写任何密钥文件**:
+启动 reme 时，插件从 DSH 运行时取 LLM 配置注入子进程 env（`LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL_NAME`），**不读、不写任何密钥文件**：
 
-- `provider` / `model`:与 dsh-user-approval 的 `smartProvider`/`smartModel` 同款语义——留空(`null`)继承 DSH 默认(`agentDefaultModel.currentSelection()`,即设置页里选的 provider/model),填了就用你自己在 DSH 里配置的那个名字;两者相互独立。
-- `apiKeyRef`:API key 从 DSH credentials seam 解析(`env → $DSH_HOME/.credentials.yaml → DSH 自己的 .env`,与 DSH 自身 LLM 同源)。留空按探测链 `DEEPSEEK_API_KEY` → `LLM_API_KEY` → `OPENAI_API_KEY` 依次尝试;自定义 ref 时填一个即可。
-- `baseUrl`:OpenAI 兼容端点。`deepseek` 系 provider 会自动给官方端点;自定义代理(如第三方中转)填一次你的地址。
-- **coherence 门控**:只有当 key 能解析到时才会注入整组配置;解析不到则完全不注入,reme 保持其自身 env / `.env` 行为(不注入空值,避免 reme 的 `${LLM_BASE_URL:-}` 默认失效)。
+- **用户只碰两个字段**：`provider` / `model`，与 dsh-user-approval 的 `smartProvider` / `smartModel` 同款语义——留空（`null`）继承 DSH 默认（`agentDefaultModel.currentSelection()`，即设置页里选的 provider/model），填了就用你自己在 DSH 里配置的那个名字；两者相互独立。
+- **API key 与端点自动推导**：从生效后的 provider（含继承来的默认 provider）在 DSH 里的 profile 读 `apiKeyEnv` 与 `baseURL`——即你已经在 DSH 里配好的那一份，用户不需要重复填。读取路径与 DSH 自己的会话目录一致（`ctx.llm.listConfigurableProviders()` + `settings.describe({redactSecrets:true})`）。
+- 取值优先级（`apiKeyRef` / `baseUrl` 是**部署方 yaml 覆盖项**，卡片上不显示）：
 
-限制(两个条件规则,本期只解决「key 来源」半边):① 若工作区 cwd 往上 5 层内存在含 `LLM_*` 的 `.env`,reme 的 `load_env(override=True)` 仍会**无条件覆盖**注入值;② key 只活在子进程 env 与内存里,同用户可经 `/proc/<pid>/environ` 读取(任何进程 env 的标准暴露面)。日志只记录来源(`key=DEEPSEEK_API_KEY@file`)与 provider/model 名字,从不记录 key 值。
+  | 项 | 优先级 |
+  |---|---|
+  | credential ref | `llm.apiKeyRef` → provider profile 的 `apiKeyEnv` → 探测链 `DEEPSEEK_API_KEY` → `LLM_API_KEY` → `OPENAI_API_KEY` |
+  | 端点 | `llm.baseUrl` → provider profile 的 `baseURL` → provider 以 `deepseek` 开头时 `https://api.deepseek.com` → 不注入 |
+
+- **安全语义**：provider profile **命名了** credential 时只认它——解析不到就**不注入**并 warn 一行（绝不回落到别的 ambient key，避免把请求记到别的租户账上；`llm-pi-ai` 自身也是 fail-loud）。profile 完全没命名 credential 时才用探测链。
+- API key 经 DSH credentials seam 解析（`env → $DSH_HOME/.credentials.yaml → DSH 自己的 .env`，与 DSH 自身 LLM 同源）。
+- **coherence 门控**：只有当 key 能解析到时才会注入整组配置；解析不到则完全不注入，reme 保持其自身 env / `.env` 行为（不注入空值，避免 reme 的 `${LLM_BASE_URL:-}` 默认失效）。
+
+限制（两个条件规则，本期只解决「key 来源」半边）：① 若工作区 cwd 往上 5 层内存在含 `LLM_*` 的 `.env`，reme 的 `load_env(override=True)` 仍会**无条件覆盖**注入值；② key 只活在子进程 env 与内存里，同用户可经 `/proc/<pid>/environ` 读取（任何进程 env 的标准暴露面）。日志只记录来源（`key=OPENCODE_CHAT_API_KEY@file`）与 provider/model/端点名字，从不记录 key 值。
 
 部署方也可在组合配置（cordis.yml / bundle patch）里覆盖这些字段。
 

@@ -69,12 +69,17 @@ source under `src/` for how each concept is realised.
   `ready` emit.
 - **plugins-page card** — The configuration entry point: a `plugins.item`
   seat registered by the browser half (`src/client/`), listed in the
-  Plugins page's Official group. Renders the Host-served `llm` section
-  through the official `SettingsForm` / `SettingsValueField`, with
-  `LlmScope` nesting the card's flat field paths back under `llm`. No
-  `settings.section` exists by design (few settings; avoid polluting the
-  Settings page). Registered unconditionally so an unserved namespace
-  shows the form's `unavailable` line instead of no card at all.
+  Plugins page's Official group. Renders **two** fields (Provider, Model —
+  the `smartProvider`/`smartModel` analogues; blank inherits the host
+  default-model selection) through the official `SettingsForm` /
+  `SettingsValueField`, with `LlmScope` nesting the card's flat field paths
+  back under `llm`. The credential reference (`apiKeyEnv`) and the endpoint
+  (`baseURL`) are not user-facing: they are derived from the effective
+  provider's DSH profile at spawn time (profile-named credential wins;
+  an unresolved named ref suppresses injection instead of using the probe
+  chain). No `settings.section` exists by design (few settings; avoid
+  polluting the Settings page). Registered unconditionally so an unserved
+  namespace shows the form's `unavailable` line instead of no card at all.
 
 ## Tooling
 
