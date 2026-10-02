@@ -63,6 +63,7 @@ export interface RemeAutoRouterConfig {
   adoptManual: Volatile<boolean>
   ports: Volatile<{ base: number; range: number }>
   pinnedDirs: Volatile<string[]>
+  llm: Volatile<{ provider: string | null; model: string | null; apiKeyRef: string | null; baseUrl: string | null }>
 }
 
 export async function apply(
@@ -91,6 +92,7 @@ export async function apply(
     adoptManual: config.adoptManual.get(),
     ports: { ...config.ports.get() },
     pinnedDirs: [...config.pinnedDirs.get()],
+    llm: { ...config.llm.get() },
   })
 
   // 3. ProcessManager is the source of truth for live reme instances.

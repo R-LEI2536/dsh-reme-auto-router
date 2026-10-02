@@ -50,6 +50,27 @@ export declare const SettingsConfig: z<Schemastery.ObjectS<NoInfer<{
     }>>>, "volatile-defined">;
     /** Workspace cwd paths (realpath canonical) whose reme is never idle-stopped. */
     pinnedDirs: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
+    /**
+     * LLM configuration handed to spawned reme processes, sourced from
+     * DSH at spawn time (see README "配置" section). Field shape mirrors
+     * dsh-user-approval's `smartProvider`/`smartModel`: `null` inherits
+     * the host default-model selection (`agentDefaultModel.currentSelection()`),
+     * a non-null value pins the exact provider route / model id the user
+     * configured in DSH. `apiKeyRef` selects the credential reference the
+     * key is resolved from; `baseUrl` overrides the OpenAI-compatible
+     * endpoint (deepseek providers default to `https://api.deepseek.com`).
+     */
+    llm: z<NoInfer<Schemastery.ObjectS<NoInfer<{
+        provider: z<string | null, string | null, "defined">;
+        model: z<string | null, string | null, "defined">;
+        apiKeyRef: z<string | null, string | null, "defined">;
+        baseUrl: z<string | null, string | null, "defined">;
+    }>>>, NoInfer<Schemastery.ObjectT<NoInfer<{
+        provider: z<string | null, string | null, "defined">;
+        model: z<string | null, string | null, "defined">;
+        apiKeyRef: z<string | null, string | null, "defined">;
+        baseUrl: z<string | null, string | null, "defined">;
+    }>>>, "volatile-defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     /** Whether the plugin kills unpinned reme processes when DSH exits. */
     killOnExit: z<boolean, boolean, "volatile-defined">;
@@ -73,6 +94,27 @@ export declare const SettingsConfig: z<Schemastery.ObjectS<NoInfer<{
     }>>>, "volatile-defined">;
     /** Workspace cwd paths (realpath canonical) whose reme is never idle-stopped. */
     pinnedDirs: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
+    /**
+     * LLM configuration handed to spawned reme processes, sourced from
+     * DSH at spawn time (see README "配置" section). Field shape mirrors
+     * dsh-user-approval's `smartProvider`/`smartModel`: `null` inherits
+     * the host default-model selection (`agentDefaultModel.currentSelection()`),
+     * a non-null value pins the exact provider route / model id the user
+     * configured in DSH. `apiKeyRef` selects the credential reference the
+     * key is resolved from; `baseUrl` overrides the OpenAI-compatible
+     * endpoint (deepseek providers default to `https://api.deepseek.com`).
+     */
+    llm: z<NoInfer<Schemastery.ObjectS<NoInfer<{
+        provider: z<string | null, string | null, "defined">;
+        model: z<string | null, string | null, "defined">;
+        apiKeyRef: z<string | null, string | null, "defined">;
+        baseUrl: z<string | null, string | null, "defined">;
+    }>>>, NoInfer<Schemastery.ObjectT<NoInfer<{
+        provider: z<string | null, string | null, "defined">;
+        model: z<string | null, string | null, "defined">;
+        apiKeyRef: z<string | null, string | null, "defined">;
+        baseUrl: z<string | null, string | null, "defined">;
+    }>>>, "volatile-defined">;
 }>>, "plain">;
 /**
  * Inferred plugin-config value type — the plain snapshot shape `apply`
@@ -103,6 +145,22 @@ export interface RemeAutoRouterSettings {
     };
     /** Workspace cwd paths (realpath canonical) whose reme is never idle-stopped. */
     pinnedDirs: string[];
+    /**
+     * LLM configuration handed to spawned reme processes at spawn time.
+     * `provider`/`model` are `null` to inherit the DSH default-model
+     * selection; `apiKeyRef` (`null` = probe chain) selects the credential
+     * reference; `baseUrl` (`null` = no injection) overrides the endpoint.
+     */
+    llm: {
+        /** DSH provider route name; `null` inherits the host default-model selection. */
+        provider: string | null;
+        /** Model id; `null` inherits the host default-model selection. */
+        model: string | null;
+        /** Credential ref for the API key; `null` probes DEEPSEEK_API_KEY → LLM_API_KEY → OPENAI_API_KEY. */
+        apiKeyRef: string | null;
+        /** OpenAI-compatible base URL; `null` disables injection (deepseek providers default to `https://api.deepseek.com`). */
+        baseUrl: string | null;
+    };
 }
 /** Default settings; documented fallback snapshot (schema defaults mirror it). */
 export declare const DEFAULT_SETTINGS: RemeAutoRouterSettings;

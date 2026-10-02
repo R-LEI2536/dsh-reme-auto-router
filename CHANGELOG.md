@@ -4,6 +4,40 @@ All notable changes to `dsh-reme-auto-router` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions adhere to [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] — LLM key sourced from DSH credentials at spawn
+
+### Added
+
+- **`llm` configuration section (mirrors dsh-user-approval's settings
+  shape)**: `provider` / `model` are `string | null` — `null` inherits
+  the host default-model selection (`agentDefaultModel.currentSelection()`),
+  a non-null value pins the exact provider route / model id configured in
+  DSH. `apiKeyRef` selects the credential reference resolved for the API
+  key, probing `DEEPSEEK_API_KEY` → `LLM_API_KEY` → `OPENAI_API_KEY` when
+  left null; `baseUrl` overrides the OpenAI-compatible endpoint (deepseek
+  providers default to `https://api.deepseek.com`).
+- **`src/llm-source.ts`**: spawn-time resolution of the reme LLM env from
+  the DSH credentials seam (`ctx.get('credentials')`) — the same
+  env → `$DSH_HOME/.credentials.yaml` → DSH `.env` layering DSH's own LLM
+  provider uses, so the key never comes from a plaintext file this plugin
+  reads or writes. Coherence gate: nothing is injected when no key
+  resolves (reme keeps its own env / `.env` behaviour); empty values are
+  never injected.
+
+### Changed
+
+- **`ProcessManager.spawn`** injects `LLM_API_KEY` / `LLM_BASE_URL` /
+  `LLM_MODEL_NAME` into the child env when resolved. Logs source
+  provenance only (`key=DEEPSEEK_API_KEY@file`, provider/model names) —
+  the key value is never logged or persisted.
+- **Docs**: README documents the `llm` section, the inheritance semantics
+  and the residual `.env`-override rule (reme's `load_env(override=True)`
+  still wins when a `.env` with `LLM_*` exists within 5 parents of the
+  workspace cwd).
+- **Tests**: new `tests/llm-source.mts` (credentials seam absent,
+  probe-chain fallback, explicit `apiKeyRef`, empty-value skip, model
+  inheritance, baseUrl defaults, key-gate) wired into `pnpm run verify`.
+
 ## [0.4.0] — DSH 0.2.0-rc.1+ host requirement
 
 > **Host requirement**: this release targets DSH `0.2.0-rc.1` or later

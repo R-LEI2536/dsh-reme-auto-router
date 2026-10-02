@@ -53,6 +53,25 @@ export const SettingsConfig = z.object({
     .volatile(),
   /** Workspace cwd paths (realpath canonical) whose reme is never idle-stopped. */
   pinnedDirs: z.array(z.string()).default([]).volatile(),
+  /**
+   * LLM configuration handed to spawned reme processes, sourced from
+   * DSH at spawn time (see README "配置" section). Field shape mirrors
+   * dsh-user-approval's `smartProvider`/`smartModel`: `null` inherits
+   * the host default-model selection (`agentDefaultModel.currentSelection()`),
+   * a non-null value pins the exact provider route / model id the user
+   * configured in DSH. `apiKeyRef` selects the credential reference the
+   * key is resolved from; `baseUrl` overrides the OpenAI-compatible
+   * endpoint (deepseek providers default to `https://api.deepseek.com`).
+   */
+  llm: z
+    .object({
+      provider: z.union([z.string().min(1), z.const(null)]).default(null),
+      model: z.union([z.string().min(1), z.const(null)]).default(null),
+      apiKeyRef: z.union([z.string().min(1), z.const(null)]).default(null),
+      baseUrl: z.union([z.string().min(1), z.const(null)]).default(null),
+    })
+    .default({ provider: null, model: null, apiKeyRef: null, baseUrl: null })
+    .volatile(),
 })
 
 /**
@@ -81,6 +100,22 @@ export interface RemeAutoRouterSettings {
   ports: { base: number; range: number }
   /** Workspace cwd paths (realpath canonical) whose reme is never idle-stopped. */
   pinnedDirs: string[]
+  /**
+   * LLM configuration handed to spawned reme processes at spawn time.
+   * `provider`/`model` are `null` to inherit the DSH default-model
+   * selection; `apiKeyRef` (`null` = probe chain) selects the credential
+   * reference; `baseUrl` (`null` = no injection) overrides the endpoint.
+   */
+  llm: {
+    /** DSH provider route name; `null` inherits the host default-model selection. */
+    provider: string | null
+    /** Model id; `null` inherits the host default-model selection. */
+    model: string | null
+    /** Credential ref for the API key; `null` probes DEEPSEEK_API_KEY → LLM_API_KEY → OPENAI_API_KEY. */
+    apiKeyRef: string | null
+    /** OpenAI-compatible base URL; `null` disables injection (deepseek providers default to `https://api.deepseek.com`). */
+    baseUrl: string | null
+  }
 }
 
 /** Default settings; documented fallback snapshot (schema defaults mirror it). */
@@ -93,4 +128,5 @@ export const DEFAULT_SETTINGS: RemeAutoRouterSettings = {
   adoptManual: true,
   ports: { base: 2_333, range: 67 },
   pinnedDirs: [],
+  llm: { provider: null, model: null, apiKeyRef: null, baseUrl: null },
 }

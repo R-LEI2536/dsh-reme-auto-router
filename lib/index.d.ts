@@ -45,6 +45,17 @@ export declare const Config: import("@deepseek-ai/schemastery").default<Schemast
         range: import("@deepseek-ai/schemastery").default<number, number, "defined">;
     }>>>, "volatile-defined">;
     pinnedDirs: import("@deepseek-ai/schemastery").default<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
+    llm: import("@deepseek-ai/schemastery").default<NoInfer<Schemastery.ObjectS<NoInfer<{
+        provider: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        model: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        apiKeyRef: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        baseUrl: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+    }>>>, NoInfer<Schemastery.ObjectT<NoInfer<{
+        provider: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        model: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        apiKeyRef: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        baseUrl: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+    }>>>, "volatile-defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     killOnExit: import("@deepseek-ai/schemastery").default<boolean, boolean, "volatile-defined">;
     shutdownGraceMs: import("@deepseek-ai/schemastery").default<number, number, "volatile-defined">;
@@ -60,6 +71,17 @@ export declare const Config: import("@deepseek-ai/schemastery").default<Schemast
         range: import("@deepseek-ai/schemastery").default<number, number, "defined">;
     }>>>, "volatile-defined">;
     pinnedDirs: import("@deepseek-ai/schemastery").default<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
+    llm: import("@deepseek-ai/schemastery").default<NoInfer<Schemastery.ObjectS<NoInfer<{
+        provider: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        model: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        apiKeyRef: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        baseUrl: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+    }>>>, NoInfer<Schemastery.ObjectT<NoInfer<{
+        provider: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        model: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        apiKeyRef: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+        baseUrl: import("@deepseek-ai/schemastery").default<string | null, string | null, "defined">;
+    }>>>, "volatile-defined">;
 }>>, "plain">;
 /**
  * Deployment-time Config value type: the `apply(config)` argument.
@@ -81,6 +103,12 @@ export interface RemeAutoRouterConfig {
         range: number;
     }>;
     pinnedDirs: Volatile<string[]>;
+    llm: Volatile<{
+        provider: string | null;
+        model: string | null;
+        apiKeyRef: string | null;
+        baseUrl: string | null;
+    }>;
 }
 export declare function apply(ctx: Context, config: RemeAutoRouterConfig): Promise<() => Promise<void>>;
 export { DEFAULT_SETTINGS, SettingsConfigSchema as SettingsConfig };

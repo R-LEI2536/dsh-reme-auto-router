@@ -63,7 +63,23 @@ idleTimeoutMs: 900000                 # 未 pin 实例的空闲停止窗口（�
 adoptManual: true                     # 是否探测并认领用户手动启动的 reme
 ports: { base: 2333, range: 67 }      # 顺序分配的端口范围
 pinnedDirs: []                        # cwd realpath 列表，pin 的永不 idle stop
+llm:                                  # spawn reme 时从 DSH 注入的 LLM 配置（见下）
+  provider: null                      # DSH provider route 名；null = 继承 DSH 默认
+  model: null                         # 模型 id；null = 继承 DSH 默认
+  apiKeyRef: null                     # credential ref；null = DEEPSEEK_API_KEY → LLM_API_KEY → OPENAI_API_KEY
+  baseUrl: null                       # OpenAI 兼容端点；null = 不注入（deepseek 官方自动给 https://api.deepseek.com）
 ```
+
+### `llm` 小节:让 reme 用上你 DSH 里配好的 provider(照 DSH User Approval 的设置形态)
+
+启动 reme 时,插件从 DSH 运行时取 LLM 配置注入子进程 env(`LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL_NAME`),**不读、不写任何密钥文件**:
+
+- `provider` / `model`:与 dsh-user-approval 的 `smartProvider`/`smartModel` 同款语义——留空(`null`)继承 DSH 默认(`agentDefaultModel.currentSelection()`,即设置页里选的 provider/model),填了就用你自己在 DSH 里配置的那个名字;两者相互独立。
+- `apiKeyRef`:API key 从 DSH credentials seam 解析(`env → $DSH_HOME/.credentials.yaml → DSH 自己的 .env`,与 DSH 自身 LLM 同源)。留空按探测链 `DEEPSEEK_API_KEY` → `LLM_API_KEY` → `OPENAI_API_KEY` 依次尝试;自定义 ref 时填一个即可。
+- `baseUrl`:OpenAI 兼容端点。`deepseek` 系 provider 会自动给官方端点;自定义代理(如第三方中转)填一次你的地址。
+- **coherence 门控**:只有当 key 能解析到时才会注入整组配置;解析不到则完全不注入,reme 保持其自身 env / `.env` 行为(不注入空值,避免 reme 的 `${LLM_BASE_URL:-}` 默认失效)。
+
+限制(两个条件规则,本期只解决「key 来源」半边):① 若工作区 cwd 往上 5 层内存在含 `LLM_*` 的 `.env`,reme 的 `load_env(override=True)` 仍会**无条件覆盖**注入值;② key 只活在子进程 env 与内存里,同用户可经 `/proc/<pid>/environ` 读取(任何进程 env 的标准暴露面)。日志只记录来源(`key=DEEPSEEK_API_KEY@file`)与 provider/model 名字,从不记录 key 值。
 
 部署方也可在组合配置（cordis.yml / bundle patch）里覆盖这些字段。
 
@@ -73,7 +89,7 @@ pinnedDirs: []                        # cwd realpath 列表，pin 的永不 idle
 pnpm run verify
 ```
 
-跑全部 5 个测试（`import-check` / `detector-state` / `state-store-race` / `smoke-apply` / `endpoint-coordinator`）+ `tsc --noEmit`。
+跑全部 6 个测试（`import-check` / `detector-state` / `state-store-race` / `smoke-apply` / `endpoint-coordinator` / `llm-source`）+ `tsc --noEmit`。
 
 ## 已知限制
 
