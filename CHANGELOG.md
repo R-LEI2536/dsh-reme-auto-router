@@ -95,8 +95,10 @@ versions adhere to [Semantic Versioning](https://semver.org/).
   and the residual `.env`-override rule (reme's `load_env(override=True)`
   still wins when a `.env` with `LLM_*` exists within 5 parents of the
   workspace cwd). It also corrects the earlier claim that the settings page is
-  generated with no client plugin, and documents the Plugins-page card as the
-  configuration entry point.
+  generated with no client plugin, and documents the plugin's component row as
+  the configuration entry point. `docs/0.4.1-ui-entry-and-spawn-race.md` records
+  the retrospective: the three bugs (client-slot entry point, row seat,
+  spawn race), the evidence chain for each, and the reusable lessons.
 - **Build**: `pnpm run build` now emits the browser bundle too
   (`lib/client.js` via `scripts/build-client.mjs`); `exports["./client"]` and
   the optional client peer dependencies are declared. The Node build excludes
